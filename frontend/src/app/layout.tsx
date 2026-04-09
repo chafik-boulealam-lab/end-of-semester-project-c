@@ -1,37 +1,7 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import Providers from "@/components/Providers";
 import "./globals.css";
-import Navigation from "@/components/Navigation";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "AI Talent Finder",
-  description: "Find the best talents with AI-powered matching",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-        <Navigation />
-        <main className="flex-1 pt-20">{children}</main>
-      </body>
-    </html>
-  );
+export const metadata: Metadata = { title:"AI Talent Finder", description:"Plateforme intelligente de recrutement — ESISA TechForge4" };
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return <html lang="fr" className="h-full antialiased"><body className="min-h-full flex flex-col font-sans"><Providers>{children}</Providers></body></html>;
 }

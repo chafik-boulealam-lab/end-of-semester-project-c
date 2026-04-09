@@ -7,7 +7,7 @@ from app.core.dependencies import get_db
 from app.models.models import Candidate
 from app.schemas.candidate import CandidateResponse, CandidateCreate, CandidateUpdate
 
-router = APIRouter(prefix="/candidates", tags=["candidates"])
+router = APIRouter(prefix="/api/candidates", tags=["candidates"])
 
 
 @router.get("/", response_model=List[CandidateResponse])

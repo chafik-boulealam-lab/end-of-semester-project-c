@@ -10,7 +10,7 @@ load_dotenv(dotenv_path=env_path)
 
 from app.core.database import Base, engine
 from app.models.models import User, Candidate, Skill, CandidateSkill, Experience, Education, JobCriteria, CriteriaSkill, MatchResult, Favorite
-from app.api import candidates, skills, jobs, matching
+from app.api import auth, candidates, skills, jobs, matching
 
 # Create database tables on startup
 Base.metadata.create_all(bind=engine)
@@ -28,7 +28,8 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Include routers
+# Include routers (Auth must be first)
+app.include_router(auth.router)
 app.include_router(candidates.router)
 app.include_router(skills.router)
 app.include_router(jobs.router)

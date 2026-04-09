@@ -8,6 +8,7 @@ from app.core.database import Base
 class UserRole(str, enum.Enum):
     admin = "admin"
     recruiter = "recruiter"
+    candidate = "candidate"
 
 
 class SkillCategory(str, enum.Enum):

@@ -8,7 +8,7 @@ from datetime import datetime
 from app.core.dependencies import get_db
 from app.models.models import JobCriteria
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 
 class JobCriteriaCreate(BaseModel):
