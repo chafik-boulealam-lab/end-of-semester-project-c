@@ -2,9 +2,9 @@ import apiClient from './api';
 
 export interface JobCriteria {
   id: number;
+  recruiter_id: number;
   title: string;
   description: string;
-  min_experience: number;
   created_at: string;
 }
 
@@ -18,8 +18,8 @@ export const jobsApi = {
     apiClient.get<JobCriteria>(`/jobs/${id}`),
 
   // Create a job
-  createJob: (data: { title: string; description: string; min_experience?: number }) =>
-    apiClient.post<JobCriteria>('/jobs/', data),
+  createJob: (data: { title: string; description: string; recruiter_id?: number }) =>
+    apiClient.post<JobCriteria>('/jobs/', { ...data, recruiter_id: data.recruiter_id ?? 1 }),
 
   // Update a job
   updateJob: (id: number, data: Partial<JobCriteria>) =>

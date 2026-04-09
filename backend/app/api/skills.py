@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from app.core.dependencies import get_db
 from app.models.models import Skill
 
-router = APIRouter(prefix="/skills", tags=["skills"])
+router = APIRouter(prefix="/api/skills", tags=["skills"])
 
 
 class SkillCreate(BaseModel):

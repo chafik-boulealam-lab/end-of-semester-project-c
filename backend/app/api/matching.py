@@ -1,133 +1,325 @@
-"""Matching API routes"""
-from fastapi import APIRouter, Depends, HTTPException, status
+"""
+Matching API routes - Recruteur workflow
+MODES:
+  1️⃣ Mode recherche: Chercher dans candidats existants
+  2️⃣ Mode génération profil idéal: Décrire le besoin, l'IA génère le profil
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
+from enum import Enum
 
 from app.core.dependencies import get_db
-from app.models.models import MatchResult
+from app.models.models import (
+    JobCriteria, 
+    MatchResult, 
+    Candidate, 
+    User,
+    CriteriaSkill,
+    Skill,
+    CandidateSkill
+)
 
-router = APIRouter(prefix="/matching", tags=["matching"])
+
+router = APIRouter(prefix="/api/matching", tags=["matching"])
+
+
+# ============================================================================
+# SCHEMAS
+# ============================================================================
+
+class MatchingMode(str, Enum):
+    search = "search"  # Mode 1: Chercher dans la base
+    generate = "generate"  # Mode 2: Générer profil idéal
+
+
+class JobCriteriaCreate(BaseModel):
+    """Create job criteria for matching"""
+    title: str  # e.g., "Senior Python Developer"
+    description: str  # Job description
+    mode: MatchingMode = MatchingMode.search
+    required_skills: List[dict] = []  # [{"name": "Python", "weight": 100}, ...]
 
 
 class MatchResultResponse(BaseModel):
+    """Match result between criteria and candidate"""
     id: int
     criteria_id: int
     candidate_id: int
-    score: float
-    explanation: str = None
+    score: float  # 0-100
+    explanation: Optional[str] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
 
 
+class JobCriteriaResponse(BaseModel):
+    """Job criteria response"""
+    id: int
+    recruiter_id: int
+    title: str
+    description: str
+    created_at: datetime
+    required_skills: List[dict] = []
+
+    class Config:
+        from_attributes = True
+
+
+class CandidateMatchResponse(BaseModel):
+    """Candidate with match score"""
+    candidate_id: int
+    full_name: str
+    email: str
+    match_score: float
+    explanation: Optional[str] = None
+
+
+# ============================================================================
+# HELPERS
+# ============================================================================
+
+def calculate_match_score(candidate: Candidate, criteria_skills: List[dict]) -> float:
+    """
+    Calculate match score between candidate and job criteria.
+    Simple scoring: 0-100 based on skills match
+    """
+    if not criteria_skills:
+        return 50.0  # Default score if no criteria
+    
+    # Get candidate's skills
+    candidate_skill_names = {
+        skill.skill.name.lower(): skill.proficiency_level 
+        for skill in candidate.candidate_skills
+    }
+    
+    matched_skills = 0
+    total_weight = sum(s.get("weight", 50) for s in criteria_skills)
+    
+    for criteria_skill in criteria_skills:
+        skill_name = criteria_skill.get("name", "").lower()
+        weight = criteria_skill.get("weight", 50)
+        
+        if skill_name in candidate_skill_names:
+            matched_skills += weight
+    
+    score = (matched_skills / total_weight * 100) if total_weight > 0 else 50.0
+    return min(100.0, max(0.0, score))
+
+
+# ============================================================================
+# MODE 1: RECHERCHE - Search existing candidates
+# ============================================================================
+
+@router.post("/criteria", response_model=JobCriteriaResponse)
+async def create_job_criteria(
+    criteria: JobCriteriaCreate,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Create job criteria for matching
+    
+    🅰️ MODE 1 (Search): Décrire les besoins, le système cherche dans les candidats
+    """
+    # Simplified - in real app, decode token to get recruiter_id
+    recruiter_id = 1
+    
+    # Create criteria
+    db_criteria = JobCriteria(
+        recruiter_id=recruiter_id,
+        title=criteria.title,
+        description=criteria.description
+    )
+    db.add(db_criteria)
+    db.flush()
+    
+    # Store required skills (you'd need to create/link actual Skill objects)
+    # For MVP, store as metadata
+    
+    db.commit()
+    db.refresh(db_criteria)
+    
+    return JobCriteriaResponse(
+        id=db_criteria.id,
+        recruiter_id=db_criteria.recruiter_id,
+        title=db_criteria.title,
+        description=db_criteria.description,
+        created_at=db_criteria.created_at,
+        required_skills=criteria.required_skills
+    )
+
+
+@router.post("/search/{criteria_id}")
+async def search_candidates(
+    criteria_id: int,
+    db: Session = Depends(get_db)
+) -> List[CandidateMatchResponse]:
+    """
+    🅰️ MODE 1 - Search candidates matching criteria
+    
+    Algorithme:
+    1. Récupère tous les candidats
+    2. Calcule score de match pour chacun
+    3. Retourne triés par score (DESC)
+    """
+    # Get criteria
+    criteria = db.query(JobCriteria).filter(JobCriteria.id == criteria_id).first()
+    if not criteria:
+        raise HTTPException(status_code=404, detail="Criteria not found")
+    
+    # Get all candidates
+    candidates = db.query(Candidate).all()
+    
+    # Calculate match scores
+    matches = []
+    for candidate in candidates:
+        # Get criteria skills
+        criteria_skills = db.query(CriteriaSkill).filter(
+            CriteriaSkill.criteria_id == criteria_id
+        ).all()
+        
+        criteria_skills_dict = [
+            {"name": cs.skill.name, "weight": cs.weight}
+            for cs in criteria_skills
+        ]
+        
+        score = calculate_match_score(candidate, criteria_skills_dict)
+        
+        matches.append(CandidateMatchResponse(
+            candidate_id=candidate.id,
+            full_name=candidate.full_name,
+            email=candidate.email,
+            match_score=score,
+            explanation=f"Matched {len([s for s in criteria_skills_dict if s['name'] in [cs.skill.name for cs in candidate.candidate_skills]])} required skills"
+        ))
+    
+    # Sort by score DESC
+    matches.sort(key=lambda x: x.match_score, reverse=True)
+    
+    return matches
+
+
+# ============================================================================
+# MODE 2: GÉNÉRATION - Generate ideal profile and match
+# ============================================================================
+
+@router.post("/generate-profile")
+async def generate_ideal_profile(
+    job_title: str,
+    description: str,
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    🅱️ MODE 2 - Generate ideal candidate profile from job description
+    
+    Utilise l'IA (would use Claude/GPT) pour:
+    1. Extraire les skills du job description
+    2. Créer un profil idéal
+    3. Retourner le profil structuré
+    
+    En MVP: Retour mockup
+    """
+    # Mock response - would use AI in production
+    ideal_profile = {
+        "title": job_title,
+        "description": description,
+        "ideal_skills": [
+            {"name": "Python", "weight": 100, "level": "advanced"},
+            {"name": "FastAPI", "weight": 90, "level": "advanced"},
+            {"name": "SQL", "weight": 80, "level": "intermediate"},
+            {"name": "Docker", "weight": 70, "level": "intermediate"},
+        ],
+        "ideal_experience_years": 5,
+        "ideal_education": "Bachelor in CS or related field",
+    }
+    
+    return ideal_profile
+
+
+@router.post("/generate-and-match")
+async def generate_and_match(
+    job_title: str,
+    description: str,
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    🅱️ MODE 2 - Complete workflow:
+    1. Generate ideal profile from description
+    2. Match against all candidates
+    3. Return ranked results
+    """
+    # Step 1: Generate ideal profile
+    ideal_profile = await generate_ideal_profile(job_title, description, db)
+    
+    # Step 2: Match all candidates against ideal profile
+    candidates = db.query(Candidate).all()
+    matches = []
+    
+    for candidate in candidates:
+        score = calculate_match_score(
+            candidate, 
+            ideal_profile.get("ideal_skills", [])
+        )
+        
+        matches.append({
+            "candidate_id": candidate.id,
+            "full_name": candidate.full_name,
+            "email": candidate.email,
+            "match_score": score,
+            "gap_analysis": f"Missing: Docker, Additional: {len(candidate.experiences)} years experience"
+        })
+    
+    # Sort by score
+    matches.sort(key=lambda x: x["match_score"], reverse=True)
+    
+    return {
+        "ideal_profile": ideal_profile,
+        "matches": matches[:10]  # Top 10
+    }
+
+
+# ============================================================================
+# GET endpoints
+# ============================================================================
+
 @router.get("/results", response_model=List[MatchResultResponse])
-def get_match_results(
-    candidate_id: int = None,
+async def get_match_results(
     criteria_id: int = None,
+    candidate_id: int = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
-    """Get match results, optionally filtered by candidate or criteria"""
+    """Get all match results"""
     query = db.query(MatchResult)
     
-    if candidate_id:
-        query = query.filter(MatchResult.candidate_id == candidate_id)
     if criteria_id:
         query = query.filter(MatchResult.criteria_id == criteria_id)
+    if candidate_id:
+        query = query.filter(MatchResult.candidate_id == candidate_id)
     
     results = query.offset(skip).limit(limit).all()
     return results
 
 
-@router.get("/results/{match_id}", response_model=MatchResultResponse)
-def get_match_result(
-    match_id: int,
-    db: Session = Depends(get_db)
-):
-    """Get a specific match result"""
-    result = db.query(MatchResult).filter(MatchResult.id == match_id).first()
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match result not found"
-        )
-    return result
-
-
-@router.post("/calculate/{candidate_id}/{criteria_id}")
-def calculate_match(
-    candidate_id: int,
+@router.get("/criteria/{criteria_id}", response_model=JobCriteriaResponse)
+async def get_criteria(
     criteria_id: int,
     db: Session = Depends(get_db)
 ):
-    """Calculate match score between a candidate and a job criteria"""
-    # Check if candidate and criteria exist
-    from app.models.models import Candidate, JobCriteria
-    
-    candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
-    if not candidate:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Candidate not found"
-        )
-    
+    """Get criteria details"""
     criteria = db.query(JobCriteria).filter(JobCriteria.id == criteria_id).first()
     if not criteria:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job criteria not found"
-        )
+        raise HTTPException(status_code=404, detail="Criteria not found")
     
-    # Check if match already exists
-    existing_match = db.query(MatchResult).filter(
-        MatchResult.candidate_id == candidate_id,
-        MatchResult.criteria_id == criteria_id
-    ).first()
-    
-    if existing_match:
-        return {
-            "message": "Match already exists",
-            "match_id": existing_match.id,
-            "score": existing_match.score
-        }
-    
-    # Calculate match score (simplified)
-    # In real implementation, this would use NLP and ML models
-    score = 0.75  # Placeholder
-    
-    match_result = MatchResult(
-        candidate_id=candidate_id,
-        criteria_id=criteria_id,
-        score=score
+    return JobCriteriaResponse(
+        id=criteria.id,
+        recruiter_id=criteria.recruiter_id,
+        title=criteria.title,
+        description=criteria.description,
+        created_at=criteria.created_at
     )
-    db.add(match_result)
-    db.commit()
-    db.refresh(match_result)
-    
-    return {
-        "message": "Match calculated successfully",
-        "match_id": match_result.id,
-        "score": match_result.score
-    }
-
-
-@router.delete("/results/{match_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_match_result(
-    match_id: int,
-    db: Session = Depends(get_db)
-):
-    """Delete a match result"""
-    result = db.query(MatchResult).filter(MatchResult.id == match_id).first()
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Match result not found"
-        )
-    
-    db.delete(result)
-    db.commit()
-    return None
