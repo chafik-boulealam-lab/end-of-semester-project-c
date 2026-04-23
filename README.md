@@ -33,6 +33,30 @@ npm install
 npm run dev
 ```
 
+### Option 3 — Railway (production)
+
+Créer 3 services Railway:
+
+- PostgreSQL (plugin Railway)
+- Backend (Root Directory: `backend`, Dockerfile)
+- Frontend (Root Directory: `frontend`, Dockerfile)
+
+Variables minimales à définir:
+
+```env
+# Backend
+DATABASE_URL=<Postgres Railway URL>
+SECRET_KEY=<minimum-32-characters>
+ALLOWED_ORIGINS=<Frontend Railway URL>
+ANTHROPIC_API_KEY=<optional>
+
+# Frontend
+NEXT_PUBLIC_API_URL=<Backend Railway URL>
+NODE_ENV=production
+```
+
+Les fichiers `backend/railway.json` et `frontend/railway.json` sont inclus pour forcer le mode Dockerfile et définir les healthchecks.
+
 ### Comptes de test
 
 | Rôle | Email | Mot de passe |
@@ -223,5 +247,5 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | Export | ReportLab (PDF), openpyxl (Excel), csv |
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS |
 | Tests | Jest (frontend), pytest (backend) |
-| Deploy | Docker Compose |
+| Deploy | Docker Compose, Railway |
 
