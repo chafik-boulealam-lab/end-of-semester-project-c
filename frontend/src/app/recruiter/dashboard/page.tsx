@@ -6,35 +6,15 @@ import { useRouter } from 'next/navigation';
 import { jobsApi } from '@/services/jobs';
 import { matchingApi } from '@/services/matching';
 import { getErrorMessage } from '@/utils/errorHandler';
+import Layout from '@/components/Layout';
 
 export default function RecruiterDashboard() {
   const router = useRouter();
   const [selectedMode, setSelectedMode] = useState<'search' | 'generate' | null>(null);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🧑‍💼</span>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent">
-              Recruteur Dashboard
-            </h1>
-          </div>
-          <button 
-            onClick={() => {
-              localStorage.removeItem('access_token');
-              setTimeout(() => router.push('/'), 100);
-            }}
-            className="px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors font-medium"
-          >
-            Déconnexion
-          </button>
-        </div>
-      </nav>
-
-      {/* Main Content */}
+    <Layout>
+{/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-md p-8 mb-8 border-l-4 border-purple-500">
@@ -169,7 +149,7 @@ export default function RecruiterDashboard() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }
 
@@ -459,7 +439,7 @@ function GenerateMode() {
           >
             <h5 className="font-bold text-gray-900 mb-4 text-lg">Compétences Idéales:</h5>
             <div className="space-y-3">
-              {idealProfile.ideal_skills?.map((skill: any, idx: number) => (
+              {idealProfile.ideal_skills?.map((skill: { name: string; weight?: number; level?: string }, idx: number) => (
                 <div key={skill.name} className="flex justify-between items-center p-3 bg-white rounded-lg hover:shadow-md transition-shadow">
                   <span className="text-gray-800 font-medium">{skill.name}</span>
                   <span className="text-sm text-purple-600 font-bold bg-purple-100 px-3 py-1 rounded-full">{skill.level}</span>

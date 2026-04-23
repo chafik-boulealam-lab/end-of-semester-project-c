@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { apiClient } from '@/services/api';
 import { candidatesApi, Candidate } from '@/services/candidates';
 import { SkeletonProfile, SkeletonCard } from '@/components/SkeletonLoader';
+import Layout from '@/components/Layout';
 
 export default function CandidateDashboard() {
   const router = useRouter();
@@ -31,7 +32,6 @@ export default function CandidateDashboard() {
           const candidateResponse = await candidatesApi.getMyProfile();
           setCandidate(candidateResponse.data);
         } catch (err) {
-          console.log('Candidate profile not found yet');
           setCandidate(null);
         }
       } catch (error) {
@@ -46,44 +46,19 @@ export default function CandidateDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <nav className="bg-white shadow-sm border-b">
-          <div className="max-w-6xl mx-auto px-4 py-4">
-            <div className="h-8 bg-gray-200 rounded w-40 animate-pulse"></div>
-          </div>
-        </nav>
-        <div className="max-w-6xl mx-auto px-4 py-8">
+      <Layout>
+        <div className="max-w-6xl mx-auto">
+          <div className="h-8 bg-gray-200 rounded w-40 animate-pulse mb-6"></div>
           <SkeletonProfile />
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">👤</span>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-              Candidat Dashboard
-            </h1>
-          </div>
-          <button 
-            onClick={() => {
-              localStorage.removeItem('access_token');
-              setTimeout(() => router.push('/'), 100);
-            }}
-            className="px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors font-medium"
-          >
-            Déconnexion
-          </button>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <Layout>
+{/* Main Content */}
+      <div className="max-w-6xl mx-auto">
         {/* Welcome Card */}
         <div className="bg-white rounded-xl shadow-md p-8 mb-8 border-l-4 border-blue-500">
           <div className="flex items-start justify-between">
@@ -280,6 +255,6 @@ export default function CandidateDashboard() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }

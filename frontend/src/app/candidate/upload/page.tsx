@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { candidatesApi } from '@/services/candidates';
 import { getErrorMessage } from '@/utils/errorHandler';
+import Layout from '@/components/Layout';
 
 export default function UploadCV() {
   const router = useRouter();
@@ -59,8 +59,12 @@ export default function UploadCV() {
     }
 
     setLoading(true);
+    setMessage({
+      type: 'success',
+      text: 'Analyse du CV en cours... Cela peut prendre jusqu a 2-3 minutes selon la taille du fichier.'
+    });
     try {
-      const response = await candidatesApi.uploadCV(file);
+      await candidatesApi.uploadCV(file);
       setMessage({
         type: 'success',
         text: '✓ CV uploadé avec succès! L\'IA analyse ton profil...'
@@ -69,7 +73,7 @@ export default function UploadCV() {
       setTimeout(() => {
         router.push('/candidate/profile');
       }, 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setMessage({
         type: 'error',
         text: getErrorMessage(error)
@@ -80,24 +84,8 @@ export default function UploadCV() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link 
-            href="/candidate/dashboard" 
-            className="text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2 hover:bg-gray-100 px-3 py-2 rounded-lg transition-all"
-          >
-            ← Retour au dashboard
-          </Link>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-            📄 Upload CV
-          </h1>
-          <div></div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
+    <Layout>
+{/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="bg-white rounded-xl shadow-md p-8 mb-8 border-l-4 border-blue-500">
@@ -125,7 +113,7 @@ export default function UploadCV() {
             <div className="text-6xl mb-4 animate-bounce">📥</div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">Glisse ton CV ici</h3>
             <p className="text-gray-600 mb-1">ou clique pour sélectionner un fichier</p>
-            <p className="text-sm text-gray-500 mb-6">Format supporté: PDF (max 10MB)</p>
+            <p className="text-sm text-gray-500 mb-6">Format supporte: PDF (max 5MB)</p>
             
             <input
               ref={fileInputRef}
@@ -209,7 +197,7 @@ export default function UploadCV() {
               {loading ? (
                 <span className="flex items-center gap-2">
                   <span className="inline-block animate-spin">⏳</span>
-                  Upload en cours...
+                  Upload et analyse en cours...
                 </span>
               ) : (
                 '✓ Upload CV'
@@ -262,6 +250,6 @@ export default function UploadCV() {
           animation: fadeIn 0.3s ease-out;
         }
       `}</style>
-    </div>
+    </Layout>
   );
 }

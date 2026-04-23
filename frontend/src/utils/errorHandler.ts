@@ -29,6 +29,15 @@ function isApiErrorResponse(error: unknown): error is { response?: { data?: ApiE
  * Handles both string details and Pydantic validation error arrays
  */
 export function getErrorMessage(error: unknown): string {
+  // Handle Axios timeout (ECONNABORTED)
+  if (
+    isApiErrorResponse(error) &&
+    typeof error.message === 'string' &&
+    error.message.toLowerCase().includes('timeout')
+  ) {
+    return 'Le traitement du CV prend plus de temps que prevu. Merci de reessayer dans quelques instants avec un fichier plus leger (max 5 MB).';
+  }
+
   // If error has response data
   if (isApiErrorResponse(error) && error.response?.data) {
     const data = error.response.data;

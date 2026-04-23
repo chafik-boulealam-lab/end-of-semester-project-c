@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { candidatesApi, Candidate } from '@/services/candidates';
 import { getErrorMessage } from '@/utils/errorHandler';
 import { SkeletonProfile } from '@/components/SkeletonLoader';
+import Layout from '@/components/Layout';
 
 export default function CandidateProfileEdit() {
   const router = useRouter();
@@ -85,52 +86,36 @@ export default function CandidateProfileEdit() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <nav className="bg-white shadow-sm border-b">
-          <div className="max-w-6xl mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">Éditer Mon Profil</h1>
-          </div>
-        </nav>
-        <div className="max-w-2xl mx-auto px-4 py-8">
+      <Layout>
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">Éditer Mon Profil</h1>
           <div className="bg-white rounded-lg shadow-md p-8">
             <SkeletonProfile />
           </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (!candidate) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Aucun profil trouvé</p>
-          <Link
-            href="/candidate/upload"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Uploader un CV
-          </Link>
+      <Layout>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">Aucun profil trouvé</p>
+            <Link href="/candidate/upload" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+              Uploader un CV
+            </Link>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/candidate/profile" className="text-gray-600 hover:text-gray-900">
-            ← Retour
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Éditer Mon Profil</h1>
-          <div></div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className="max-w-2xl mx-auto px-4 py-8">
+    <Layout>
+{/* Main Content */}
+      <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-8">
           {error && (
             <div
@@ -276,6 +261,6 @@ export default function CandidateProfileEdit() {
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

@@ -5,6 +5,8 @@ Enhanced Skill Extractor - Combines NER + Dictionary Fuzzy Matching
 
 from typing import List, Dict, Optional
 import json
+import os
+import re
 
 try:
     from transformers import pipeline
@@ -13,6 +15,7 @@ except ImportError:
     NER_AVAILABLE = False
 
 from ai_module.nlp.skill_extractor import SkillExtractor
+from ai_module.matching.semantic_matcher import SemanticSkillMatcher
 
 
 class EnhancedSkillExtractor:
@@ -26,12 +29,15 @@ class EnhancedSkillExtractor:
     def __init__(self, load_ner: bool = True):
         """Initialize both extraction methods"""
         self.skill_extractor = SkillExtractor()
+        self.canonical_skills = list(self.skill_extractor.all_skills)
+        self.semantic_threshold = float(os.getenv("SKILL_NORMALIZATION_THRESHOLD", "0.62"))
+        self.ner_model_name = os.getenv("HF_SKILL_NER_MODEL", "dslim/bert-base-NER")
         
         if load_ner and NER_AVAILABLE:
             try:
                 self.ner_pipeline = pipeline(
                     "ner",
-                    model="AventIQ-AI/Resume-Parsing-NER-AI-Model",
+                    model=self.ner_model_name,
                     aggregation_strategy="simple"
                 )
                 self.ner_available = True
@@ -83,35 +89,77 @@ class EnhancedSkillExtractor:
                 }
                 all_skills.append(skill_data)
                 seen_skills.add(skill_name_lower)
+
+        # Step 3: Embedding-based normalization to canonical skill list.
+        normalized = self._normalize_with_embeddings(all_skills)
+        if normalized:
+            all_skills = normalized
         
         # Sort by confidence descending
         all_skills.sort(key=lambda x: x.get("confidence", 0), reverse=True)
         
         return all_skills
+
+    def _normalize_with_embeddings(self, skills: List[Dict]) -> List[Dict]:
+        """Map extracted skill variants to nearest canonical skills via embeddings."""
+        if not skills:
+            return []
+
+        normalized: List[Dict] = []
+        seen = set()
+
+        for skill in skills:
+            raw_name = str(skill.get("name", "")).strip()
+            if not raw_name:
+                continue
+
+            nearest = SemanticSkillMatcher.search_similar(raw_name, self.canonical_skills, top_k=1)
+            if nearest:
+                best_name, similarity = nearest[0]
+                if similarity >= self.semantic_threshold:
+                    skill["normalized_name"] = best_name
+                    skill["normalization_similarity"] = round(similarity, 4)
+                    skill["name"] = best_name
+
+            key = str(skill.get("name", "")).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            normalized.append(skill)
+
+        return normalized
     
     def _extract_via_ner(self, text: str) -> List[Dict]:
-        """Extract SKILL entities from NER pipeline"""
+        """Extract candidate skill entities from NER pipeline output."""
         if not self.ner_available or not text:
             return []
         
         try:
-            # Truncate to max length (512 tokens)
-            text_truncated = text[:512]
+            # Keep runtime bounded.
+            text_truncated = text[:2000]
             
             ner_results = self.ner_pipeline(text_truncated)
             
             ner_skills = []
             for entity in ner_results:
-                if entity.get("entity_group") == "SKILL" and entity.get("score", 0) > 0.75:
-                    skill_name = entity["word"].strip().replace("##", "")
-                    
-                    ner_skills.append({
-                        "name": skill_name.title(),
-                        "source": "NER",
-                        "confidence": float(entity.get("score", 0.95)),
-                        "category": self._classify_skill(skill_name),
-                        "method": "NER-BERT"
-                    })
+                group = str(entity.get("entity_group", "")).upper()
+                if group not in {"MISC", "ORG", "SKILL"}:
+                    continue
+                if entity.get("score", 0) <= 0.70:
+                    continue
+
+                skill_name = str(entity.get("word", "")).strip().replace("##", "")
+                skill_name = re.sub(r"\s+", " ", skill_name)
+                if len(skill_name) < 2:
+                    continue
+
+                ner_skills.append({
+                    "name": skill_name.title(),
+                    "source": "NER",
+                    "confidence": float(entity.get("score", 0.95)),
+                    "category": self._classify_skill(skill_name),
+                    "method": f"NER-{self.ner_model_name}"
+                })
             
             return ner_skills
         except Exception as e:

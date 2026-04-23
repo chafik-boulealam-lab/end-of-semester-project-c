@@ -33,7 +33,7 @@ export default function LoginPage() {
         // Admin or unknown role
         router.push('/');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);

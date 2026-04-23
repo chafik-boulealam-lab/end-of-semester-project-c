@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useApi } from '@/hooks/useApi';
 import { jobsApi, JobCriteria } from '@/services/jobs';
 import { skillsApi, Skill } from '@/services/skills';
+import Layout from '@/components/Layout';
+import { getErrorMessage } from '@/utils/errorHandler';
 
 type SelectedSkill = {
   skill: Skill;
@@ -71,16 +73,16 @@ export default function JobsPage() {
       setSelectedSkills([]);
       setMessage({ type: 'success', text: 'Critère créé avec succès.' });
       refetchCriteria();
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.response?.data?.detail || 'Erreur lors de la création du critère.' });
+    } catch (error: unknown) {
+      setMessage({ type: 'error', text: getErrorMessage(error) });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <Layout>
+      <div>
         <div className="mb-8 flex items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Gestion des critères</h1>
@@ -230,6 +232,6 @@ export default function JobsPage() {
           </section>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

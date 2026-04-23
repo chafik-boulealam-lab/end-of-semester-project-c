@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 import { Download, FileText, Sheet, File, AlertCircle } from "lucide-react";
+import Layout from '@/components/Layout';
+import apiClient from '@/services/api';
 
 interface ExportOption {
   id: string;
@@ -69,20 +71,12 @@ export default function ExportPage() {
     setMessage(null);
 
     try {
-      const token = localStorage.getItem("access_token");
-      const response = await fetch(`http://localhost:8000/api/export/${selectedFormat}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(settings)
+      const response = await apiClient.post(`/api/export/${selectedFormat}`, settings, {
+        responseType: 'blob',
       });
 
-      if (!response.ok) throw new Error("Export failed");
-
       // Download file
-      const blob = await response.blob();
+      const blob = new Blob([response.data]);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -102,7 +96,7 @@ export default function ExportPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 p-6">
+    <Layout>
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -266,6 +260,6 @@ export default function ExportPage() {
           </p>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

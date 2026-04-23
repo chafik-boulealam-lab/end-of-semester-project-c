@@ -1,190 +1,227 @@
-# 🧠 AI TALENT FINDER - Plateforme de Matching Candidat/Recruteur
+# 🧠 AI Talent Finder
 
-**Version:** 1.0.0  
-**Status:** ✅ MVP Production Ready  
-**Date:** Avril 2026  
+**Plateforme intelligente de recrutement assistée par IA**
 
----
-
-## 🎯 À PROPOS
-
-AI Talent Finder est une plateforme innovante qui connecte les candidats avec les recruteurs en utilisant deux approches de matching distinctes:
-
-- **👤 Parcours Candidat:** Upload CV → Profil structuré → Visible aux recruteurs
-- **🧑‍💼 Parcours Recruteur:** 
-  - 🅰️ Mode Recherche (approche traditionnelle)
-  - 🅱️ Mode Génération (approche IA-powered)
-
-**Créé par:** Yani Ilyass, Gopou Dore, Junior Sy, ElHadj Bassiro, Youbi Omar  
-**Année:** 3ème année, Groupe A
+ESISA-TechForge4 — SY El Hadji Bassirou • DORE Gopou Junior • YANI Ilyass • YOUBI Omar
 
 ---
 
-## 🚀 DÉMARRAGE RAPIDE (5 MIN)
+## 🚀 Démarrage rapide
 
-### 1. Backend
+### Option 1 — Docker (recommandé)
+
 ```bash
-cd backend
-source venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+cp .env.example .env    # Configurer les variables
+docker-compose up       # Lance PostgreSQL + Backend + Frontend
 ```
 
-### 2. Frontend (nouveau terminal)
+→ Frontend : `http://localhost:3000`
+→ Backend : `http://localhost:8000/docs`
+
+### Option 2 — Manuel
+
 ```bash
+# Terminal 1 — Backend
+cd backend
+python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+
+# Terminal 2 — Frontend
 cd frontend
+npm install
 npm run dev
 ```
 
-### 3. Accéder
-**http://localhost:3000**
+### Comptes de test
+
+| Rôle | Email | Mot de passe |
+|---|---|---|
+| Candidat | alice@test.com | password123 |
+| Recruteur | bob@test.com | password123 |
 
 ---
 
-## ✅ STATUT DU PROJET
-
-### Étape 2: Backend Infrastructure ✅ COMPLÈTE
-- 10 modèles SQLAlchemy
-- FastAPI + SQLAlchemy + PostgreSQL
-- Security (bcrypt + JWT)
-- 15+ dépendances installées
-
-### Étape 3: Authentification ✅ COMPLÈTE
-- POST /api/auth/register - Inscription avec rôle
-- POST /api/auth/login - Connexion
-- GET /api/auth/me - Utilisateur courant
-- Support 3 rôles: candidate, recruiter, admin
-
-### Étape 4: Frontend ✅ COMPLÈTE
-- Landing page avec 2 parcours
-- Dashboard candidat (upload, profil)
-- Dashboard recruteur (2 modes matching)
-- Shortlist et export
-- Auth system avec JWT
-
----
-
-## 📚 DOCUMENTATION
-
-**Lire en priorité:**
-1. [COMPLETION_REPORT.md](./COMPLETION_REPORT.md) - Résumé exécutif
-2. [ETAPE3_COMPLETE.md](./ETAPE3_COMPLETE.md) - Guide technique
-3. [GUIDE_COMPLET_CANDIDAT_RECRUTEUR.md](./GUIDE_COMPLET_CANDIDAT_RECRUTEUR.md) - Workflows
-
----
-
-## 🎯 FEATURES
-
-✅ **Candidat:**
-- Register avec email/password/name
-- Upload CV (PDF)
-- AI extracts skills automatiquement
-- Profil structuré visible aux recruteurs
-
-✅ **Recruteur:**
-- Register avec email/password/name
-- Mode 1 (Recherche): Critères → Candidats
-- Mode 2 (Génération): Besoins texte → Profil IA → Matching
-- Shortlist favoris
-- Export CSV
-
-✅ **Sécurité:**
-- Passwords hachés (bcrypt)
-- JWT tokens (30 jours)
-- CORS configuré
-- Email unique
-
----
-
-## 📁 STRUCTURE
+## 📁 Structure du projet
 
 ```
-backend/
-├── app/
-│   ├── api/
-│   │   ├── auth.py ..................... ✅ IMPLÉMENTÉ
-│   │   └── matching.py ................ ✅ 2 modes
-│   ├── models/ ........................ ✅ 10 modèles
-│   ├── schemas/user.py ............... ✅ Créé
-│   └── main.py ....................... ✅ Routes importées
+AI-Talent-Finder/
+├── backend/
+│   ├── app/
+│   │   ├── api/              # 13 fichiers de routes
+│   │   │   ├── auth.py       # POST /register, /login, GET /me
+│   │   │   ├── candidates.py # CRUD candidats + upload CV
+│   │   │   ├── skills.py     # CRUD compétences
+│   │   │   ├── jobs.py       # CRUD critères de poste
+│   │   │   ├── criteria.py   # Critères avancés + matching
+│   │   │   ├── matching.py   # Moteur de matching + profil idéal
+│   │   │   ├── favorites.py  # Shortlist favoris
+│   │   │   ├── chat.py       # Chatbot IA (Anthropic + fallback)
+│   │   │   ├── export.py     # Export PDF/CSV/Excel
+│   │   │   ├── experiences.py
+│   │   │   ├── educations.py
+│   │   │   └── match_results.py
+│   │   ├── models/models.py  # 10 modèles SQLAlchemy
+│   │   ├── schemas/          # Schémas Pydantic
+│   │   ├── services/         # CV extractor, matching engine
+│   │   └── core/             # Database, security, dependencies
+│   ├── ai_module/            # NLP, matching sémantique, chatbot
+│   ├── alembic/              # Migrations BDD
+│   └── requirements.txt
 │
-frontend/src/
-├── app/
-│   ├── page.tsx ...................... ✅ Landing
-│   ├── auth/register ................. ✅ Choix rôle
-│   ├── candidate/ .................... ✅ Dashboard + upload
-│   └── recruiter/ .................... ✅ 2 modes matching
-└── services/
-    └── auth.ts ...................... ✅ Mis à jour
+├── frontend/
+│   ├── src/
+│   │   ├── app/              # 17 pages (Next.js App Router)
+│   │   ├── components/       # 9 composants réutilisables
+│   │   ├── services/         # 10 services API (Axios)
+│   │   ├── hooks/            # useApi, useTheme
+│   │   └── utils/            # errorHandler
+│   ├── jest.config.js        # Configuration tests
+│   └── package.json
+│
+├── docker-compose.yml
+└── .env.example
 ```
 
 ---
 
-## 🔐 API ENDPOINTS
+## 🔵 Parcours Recruteur
 
 ```
-POST   /api/auth/register         Register user
-POST   /api/auth/login            Login user  
-GET    /api/auth/me               Get current user
+Login → Critères de poste → Matching → Explorer candidats → Chatbot IA → Shortlist → Export
+```
 
-POST   /api/matching/criteria      Create job criteria
-POST   /api/matching/search/{id}   Mode 1: Search
-POST   /api/matching/generate-profile  Mode 2: Generate
-POST   /api/matching/generate-and-match Mode 2: Complete
+| Page | Route | Description |
+|---|---|---|
+| Dashboard | `/recruiter/dashboard` | 2 modes : recherche classique + génération IA |
+| Candidats | `/candidates` | Liste avec recherche, favoris, suppression |
+| Détail candidat | `/candidates/[id]` | Profil complet avec données NER extraites |
+| Compétences | `/skills` | CRUD dictionnaire de compétences |
+| Critères de poste | `/jobs` | Créer critères avec compétences pondérées |
+| Matching | `/matching` | Critères + sliders → classement par score |
+| Chatbot | `/recruiter/chatbot` | Questions IA (expliquer, comparer, explorer, ajuster) |
+| Shortlist | `/recruiter/shortlist` | Candidats favoris avec détails |
+| Export | `/recruiter/export` | Export PDF, CSV, Excel avec options |
+
+## 🟢 Parcours Candidat
+
+```
+Login → Upload CV → Analyse IA → Profil généré → Stockage en base
+```
+
+| Page | Route | Description |
+|---|---|---|
+| Dashboard | `/candidate/dashboard` | Parcours en étapes avec progression |
+| Upload CV | `/candidate/upload` | Drag & drop PDF avec extraction automatique |
+| Mon profil | `/candidate/profile` | Profil structuré extrait du CV (NER) |
+| Éditer profil | `/candidate/profile/edit` | Modifier ses informations |
+
+---
+
+## 🔌 API Backend — Routes complètes
+
+### Authentification
+```
+POST /api/auth/register     # Inscription (email, password, full_name, role)
+POST /api/auth/login        # Connexion → JWT token
+GET  /api/auth/me           # Utilisateur courant (protégé)
+```
+
+### Candidats
+```
+GET    /api/candidates/           # Liste des candidats
+POST   /api/candidates/           # Créer un candidat
+GET    /api/candidates/me/profile # Mon profil (candidat authentifié)
+POST   /api/candidates/upload     # Upload CV (PDF)
+GET    /api/candidates/{id}       # Détail candidat
+PUT    /api/candidates/{id}       # Modifier candidat
+DELETE /api/candidates/{id}       # Supprimer candidat
+```
+
+### Compétences
+```
+GET    /api/skills/        # Liste (filtre par catégorie: tech/soft/language)
+POST   /api/skills/        # Créer une compétence
+DELETE /api/skills/{id}    # Supprimer
+```
+
+### Critères de poste
+```
+GET    /api/criteria/      # Liste des critères
+POST   /api/criteria/      # Créer critères avec compétences pondérées
+PUT    /api/criteria/{id}  # Modifier
+DELETE /api/criteria/{id}  # Supprimer
+```
+
+### Matching
+```
+POST /api/matching/criteria               # Créer critères via matching
+POST /api/matching/search/{criteria_id}   # Recherche candidats
+POST /api/matching/{criteria_id}/results  # Lancer le matching
+GET  /api/matching/{criteria_id}/results  # Résultats classés
+POST /api/matching/generate-and-match     # Mode IA: profil idéal → matching
+POST /api/matching/calculate/{cand}/{crit} # Calcul individuel
+```
+
+### Favoris
+```
+GET    /api/favorites/              # Liste des favoris
+POST   /api/favorites/{candidate_id} # Ajouter aux favoris
+DELETE /api/favorites/{candidate_id} # Retirer
+```
+
+### Chatbot
+```
+POST /api/chat    # Envoyer un message (avec contexte)
+```
+
+### Export
+```
+POST /api/export/csv    # Export CSV
+POST /api/export/excel  # Export Excel
+POST /api/export/pdf    # Export PDF
 ```
 
 ---
 
-## 🧪 TEST RAPIDE
+## 🧪 Tests
 
 ```bash
-# Register candidat
-curl -X POST http://localhost:8000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"alice@example.com","password":"pass123","full_name":"Alice","role":"candidate"}'
+# Frontend (63 tests)
+cd frontend && npm test
 
-# Login
-curl -X POST http://localhost:8000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"alice@example.com","password":"pass123"}'
-
-# Get me (replace TOKEN)
-curl http://localhost:8000/api/auth/me \
-  -H "Authorization: Bearer TOKEN"
+# Backend
+cd backend && python -m pytest tests/
 ```
 
 ---
 
-## 💻 REQUIREMENTS
+## ⚙️ Variables d'environnement
 
-- Python 3.12+
-- Node.js 22+
-- PostgreSQL 14+
+Copier `.env.example` → `.env` et configurer :
 
----
-
-## 🚀 PRODUCTION
-
-```bash
-# Docker
-docker-compose up -d
-
-# Manual: See COMPLETION_REPORT.md
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_talent_finder
+SECRET_KEY=your-secret-key-minimum-32-characters
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+ALLOWED_ORIGINS=http://localhost:3000
+ANTHROPIC_API_KEY=sk-ant-...    # Optionnel (chatbot fonctionne en fallback)
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 ---
 
-## 📞 TEAM
+## 📊 Stack technique
 
-- **Backend Lead:** [Your name]
-- **Frontend Lead:** [Your name]
-- **Database:** ElHadj Bassiro
+| Composant | Technologie |
+|---|---|
+| Backend | FastAPI, SQLAlchemy, PostgreSQL, Alembic |
+| Auth | JWT (python-jose), bcrypt/argon2 (passlib) |
+| IA / NLP | spaCy, scikit-learn, transformers, fuzzywuzzy |
+| Chatbot | Anthropic Claude API (avec fallback rule-based) |
+| Export | ReportLab (PDF), openpyxl (Excel), csv |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS |
+| Tests | Jest (frontend), pytest (backend) |
+| Deploy | Docker Compose |
 
----
-
-## 📝 LICENSE
-
-MIT License
-
----
-
-**Status: ✅ Ready for Étape 5 (CV Processing + Advanced Matching)**

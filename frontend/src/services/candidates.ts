@@ -24,6 +24,8 @@ export interface Candidate {
 }
 
 export const candidatesApi = {
+  UPLOAD_TIMEOUT_MS: Number(process.env.NEXT_PUBLIC_CV_UPLOAD_TIMEOUT_MS || 180000),
+
   // GET /api/candidates/me/profile — Récupérer mon profil (candidat authentifié)
   getMyProfile: () =>
     apiClient.get<Candidate>('/api/candidates/me/profile'),
@@ -43,7 +45,9 @@ export const candidatesApi = {
     if (fullName) formData.append('full_name', fullName);
     if (email) formData.append('email', email);
     // Don't manually set Content-Type for FormData - axios will set it with proper boundary
-    return apiClient.post('/api/candidates/upload', formData);
+    return apiClient.post('/api/candidates/upload', formData, {
+      timeout: candidatesApi.UPLOAD_TIMEOUT_MS,
+    });
   },
 
   // POST /api/candidates/ — Créer un candidat manuellement

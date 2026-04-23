@@ -154,12 +154,12 @@ def _pdf_response(rows: List[List[str]], filename: str) -> StreamingResponse:
     document = SimpleDocTemplate(buffer, pagesize=landscape(letter))
     table = Table(rows, repeatRows=1)
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("1E3A8A")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("CBD5E1")),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("F8FAFC")]),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#CBD5E1")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F8FAFC")]),
     ]))
     document.build([table])
     buffer.seek(0)

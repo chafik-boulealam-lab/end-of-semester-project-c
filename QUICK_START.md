@@ -40,6 +40,7 @@ python test_semantic_matching.py
 ```
 
 **Cela va exécuter 4 tests :**
+
 1. ✓ Similarité entre paires de compétences
 2. ✓ Matching candidat vs critères
 3. ✓ Performance du cache
@@ -66,6 +67,7 @@ python test_api_semantic_matching.py
 ```
 
 Cela va:
+
 - Créer des critères de job
 - Chercher des candidats matching
 - Générer un profil idéal
@@ -149,6 +151,7 @@ curl -X POST http://localhost:8000/api/matching/generate-and-match \
 ### Semantic Matching (Matching Sémantique)
 
 **Ancien système (exact matching):**
+
 ```
 Candidat: "Python", "Flask", "PostgreSQL"
 Critères: "Python", "Django", "Database"
@@ -156,6 +159,7 @@ Résultat: 1 match sur 3 = 33%
 ```
 
 **Nouveau système (semantic matching):**
+
 ```
 Candidat: "Python", "Flask", "PostgreSQL"
 Critères: "Python", "Django", "Database"
@@ -220,16 +224,40 @@ SemanticSkillMatcher.clear_cache()
 
 ## 📊 Performance
 
-| Opération | Temps |
-|-----------|-------|
-| Charger le modèle | ~2-3 secondes (une fois) |
-| Embedding une compétence | 5-10 ms (première fois) |
-| Embedding une compétence (cached) | <1 ms |
-| Matcher 10 compétences vs 5 critères | ~50-100 ms |
+| Opération                            | Temps                    |
+| ------------------------------------ | ------------------------ |
+| Charger le modèle                    | ~2-3 secondes (une fois) |
+| Embedding une compétence             | 5-10 ms (première fois)  |
+| Embedding une compétence (cached)    | <1 ms                    |
+| Matcher 10 compétences vs 5 critères | ~50-100 ms               |
 
 ---
 
 ## 🐛 Troubleshooting
+
+### Mode Extraction CV Qualite Max (OCR agressif)
+
+Pour maximiser la qualite d'extraction sur des CV scans/PDF complexes:
+
+```bash
+# macOS
+brew install tesseract tesseract-lang
+
+cd backend
+cp .env.quality-max.example .env
+pip install -r requirements.txt
+```
+
+Variables OCR principales:
+
+- `CV_OCR_MODE=aggressive` : force l'OCR sur les PDF
+- `CV_OCR_MODE=ultra` : OCR page par page sur les zones faibles (qualite max)
+- `CV_OCR_MAX_PAGES=12` : lit plus de pages
+- `CV_OCR_DPI=300` : meilleure lecture OCR
+- `CV_OCR_LANG=fra+eng` : meilleur mix FR/EN
+- `CV_OCR_PAGE_TRIGGER_SCORE=140` : seuil de declenchement OCR par page en mode ultra
+
+Tradeoff attendu: meilleure extraction, mais upload plus long.
 
 ### Erreur: "sentence-transformers not installed"
 
@@ -243,6 +271,23 @@ pip install torch==2.2.*
 ```bash
 # Forcer le téléchargement
 python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
+```
+
+### Erreur: "Failed building wheel for faiss-cpu" / "swig not found"
+
+Le projet fonctionne sans FAISS (fallback automatique actif). Si l'installation de `faiss-cpu` echoue, continue avec:
+
+```bash
+cd backend
+python3.12 -m pip install -r requirements.txt
+```
+
+Si tu veux FAISS quand meme:
+
+```bash
+brew install swig
+cd backend
+python3.12 -m pip install -r requirements-faiss-optional.txt
 ```
 
 ### CPU vs GPU
@@ -261,13 +306,13 @@ from ai_module.matching.semantic_matcher import SemanticSkillMatcher
 
 ## 📚 Fichiers Importants
 
-| Fichier | Description |
-|---------|-------------|
-| `SEMANTIC_MATCHING_SUMMARY.md` | Vue d'ensemble complète |
-| `SEMANTIC_MATCHING_GUIDE.md` | Guide détaillé + architecture |
-| `ai_module/matching/semantic_matcher.py` | Code principal |
-| `test_semantic_matching.py` | Tests du module |
-| `test_api_semantic_matching.py` | Tests de l'API |
+| Fichier                                  | Description                   |
+| ---------------------------------------- | ----------------------------- |
+| `SEMANTIC_MATCHING_SUMMARY.md`           | Vue d'ensemble complète       |
+| `SEMANTIC_MATCHING_GUIDE.md`             | Guide détaillé + architecture |
+| `ai_module/matching/semantic_matcher.py` | Code principal                |
+| `test_semantic_matching.py`              | Tests du module               |
+| `test_api_semantic_matching.py`          | Tests de l'API                |
 
 ---
 
@@ -293,6 +338,7 @@ from ai_module.matching.semantic_matcher import SemanticSkillMatcher
 ## 💡 Tips & Tricks
 
 ### Déboguer un match
+
 ```python
 # Voir les détails d'un matching
 result = SemanticSkillMatcher.match_candidate_skills(...)
@@ -304,6 +350,7 @@ for match in result['matched_skills']:
 ```
 
 ### Tester rapidement deux skills
+
 ```python
 from ai_module.matching.semantic_matcher import semantic_skill_match
 
@@ -312,6 +359,7 @@ print(f"Match: {is_match}, Score: {sim:.1%}")
 ```
 
 ### Batch processing (plus rapide)
+
 ```python
 # Plus rapide que d'appeler get_embedding() plusieurs fois
 embeddings = SemanticSkillMatcher.get_embeddings_batch([

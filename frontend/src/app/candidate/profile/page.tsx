@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { candidatesApi, Candidate } from '@/services/candidates';
 import { getErrorMessage } from '@/utils/errorHandler';
 import { SkeletonProfile } from '@/components/SkeletonLoader';
+import Layout from '@/components/Layout';
 
 export default function CandidateProfile() {
   const router = useRouter();
@@ -15,22 +16,46 @@ export default function CandidateProfile() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const role = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
+    if (role && role !== 'candidate') {
+      if (role === 'recruiter') {
+        router.replace('/recruiter/dashboard');
+      } else if (role === 'admin') {
+        router.replace('/');
+      } else {
+        router.replace('/auth/login');
+      }
+      return;
+    }
+
     // Prevent duplicate calls in React StrictMode during development.
     if (didLoadRef.current) return;
     didLoadRef.current = true;
     loadProfile();
-  }, []);
+  }, [router]);
 
   const loadProfile = async () => {
     try {
       setLoading(true);
-      console.log('📡 Fetching profile...');
       const response = await candidatesApi.getMyProfile();
-      console.log('✅ Profile fetched:', response.data);
       setCandidate(response.data);
       setError(null);
     } catch (err: unknown) {
-      if (err?.response?.status === 404) {
+      const axiosErr = err as { response?: { status?: number } };
+      if (axiosErr?.response?.status === 403) {
+        const role = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
+        if (role === 'recruiter') {
+          router.replace('/recruiter/dashboard');
+          return;
+        }
+        if (role === 'admin') {
+          router.replace('/');
+          return;
+        }
+        router.replace('/auth/login');
+        return;
+      }
+      if (axiosErr?.response?.status === 404) {
         router.replace('/candidate/upload');
         return;
       }
@@ -43,72 +68,59 @@ export default function CandidateProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <nav className="bg-white shadow-sm border-b">
-          <div className="max-w-6xl mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold text-blue-600">🧑 Mon Profil</h1>
-          </div>
-        </nav>
-        <div className="max-w-4xl mx-auto px-4 py-8">
+      <Layout>
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-2xl font-bold text-blue-600 mb-6">🧑 Mon Profil</h1>
           <SkeletonProfile />
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full">
-          <div
-            role="alert"
-            aria-live="assertive"
-            aria-atomic="true"
-            className="bg-red-50 border border-red-200 rounded-lg p-4"
-          >
-            <p className="text-red-700 font-semibold">❌ Erreur</p>
-            <p className="text-red-600 text-sm mt-2">{error}</p>
-            <Link
-              href="/candidate/upload"
-              className="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              ← Uploader un CV
-            </Link>
+      <Layout>
+        <div className="flex items-center justify-center py-20">
+          <div className="max-w-md w-full">
+            <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-700 font-semibold">❌ Erreur</p>
+              <p className="text-red-600 text-sm mt-2">{error}</p>
+              <Link href="/candidate/upload" className="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                ← Uploader un CV
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (!candidate) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Aucun profil trouvé</p>
-          <Link
-            href="/candidate/upload"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Uploader un CV
-          </Link>
+      <Layout>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">Aucun profil trouvé</p>
+            <Link href="/candidate/upload" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+              Uploader un CV
+            </Link>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   // Parse les champs JSON si nécessaire - avec gestion d'erreur
   const safeJsonParse = (
-    jsonString: string | null,
+    jsonString: string | null | undefined,
     fallback: unknown[] = [],
     useFallbackIfEmpty = false
   ) => {
     try {
       if (!jsonString) {
-        console.log('⚠️  Empty string, using fallback');
         return fallback;
       }
       const parsed = JSON.parse(jsonString);
-      console.log('✅ Parsed:', jsonString.substring(0, 50), '...');
       if (!Array.isArray(parsed)) {
         return fallback;
       }
@@ -122,7 +134,7 @@ export default function CandidateProfile() {
     }
   };
 
-  const safeJsonObjectParse = (jsonString: string | null, fallback: Record<string, unknown> = {}) => {
+  const safeJsonObjectParse = (jsonString: string | null | undefined, fallback: Record<string, unknown> = {}) => {
     try {
       if (!jsonString) return fallback;
       const parsed = JSON.parse(jsonString);
@@ -152,18 +164,18 @@ export default function CandidateProfile() {
 
   const toExperienceArray = (value: unknown): ExtractedExperience[] => {
     if (!Array.isArray(value)) return [];
-    return value
-      .map((item) => {
-        if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
-        const data = item as Record<string, unknown>;
-        const title = typeof data.title === 'string' ? data.title.trim() : '';
-        const company = typeof data.company === 'string' ? data.company.trim() : '';
-        const period = typeof data.period === 'string' ? data.period.trim() : null;
-        const responsibilities = toStringArray(data.responsibilities).filter((line) => line.length > 0);
-        if (!title && !company && responsibilities.length === 0) return null;
-        return { title, company, period, responsibilities };
-      })
-      .filter((item): item is ExtractedExperience => item !== null);
+    const results: ExtractedExperience[] = [];
+    for (const item of value) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+      const data = item as Record<string, unknown>;
+      const title = typeof data.title === 'string' ? data.title.trim() : '';
+      const company = typeof data.company === 'string' ? data.company.trim() : '';
+      const period = typeof data.period === 'string' ? data.period.trim() : null;
+      const responsibilities = toStringArray(data.responsibilities).filter((line) => line.length > 0);
+      if (!title && !company && responsibilities.length === 0) continue;
+      results.push({ title, company, period, responsibilities });
+    }
+    return results;
   };
 
   const jobTitles = safeJsonParse(candidate.extracted_job_titles, []);
@@ -186,55 +198,10 @@ export default function CandidateProfile() {
   const linkedinUrl = candidate.linkedin_url || linkedins[0] || null;
   const experiences = toExperienceArray(nerData.experiences);
 
-  console.log('🎯 Parsed data:', {
-    jobTitles,
-    companies,
-    education,
-    emails,
-    phones,
-    languages,
-    softSkills,
-    interests,
-    locations,
-    linkedins,
-    githubUrls,
-    portfolioUrls,
-    certifications,
-    projects,
-    profileSummary,
-    experiences,
-  });
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/candidate/dashboard" className="text-gray-600 hover:text-gray-900">
-            ← Retour
-          </Link>
-          <h1 className="text-2xl font-bold text-blue-600">🧑 Mon Profil</h1>
-          <div className="flex gap-2">
-            <button
-              onClick={loadProfile}
-              aria-label="Rafraîchir le profil"
-              className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              🔄 Rafraîchir
-            </button>
-            <Link
-              href="/candidate/profile/edit"
-              aria-label="Éditer le profil"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 inline-block"
-            >
-              ✏️ Éditer
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <Layout>
+{/* Content */}
+      <div className="max-w-4xl mx-auto">
         {/* Profile Header Card */}
         <div className="bg-white rounded-lg shadow-md p-8 mb-8">
           <div className="flex justify-between items-start mb-6">
@@ -572,6 +539,6 @@ export default function CandidateProfile() {
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

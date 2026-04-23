@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { favoritesApi } from '@/services/favorites';
 import { candidatesApi, Candidate } from '@/services/candidates';
 import { getErrorMessage } from '@/utils/errorHandler';
+import Layout from '@/components/Layout';
 
 interface ShortlistItem {
   favorite_id: number;
@@ -89,27 +90,8 @@ export default function RecruiterShortlist() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link 
-            href="/recruiter/dashboard" 
-            className="text-gray-600 hover:text-gray-900 font-medium flex items-center gap-2 hover:bg-gray-100 px-3 py-2 rounded-lg transition-all"
-          >
-            ← Retour
-          </Link>
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">⭐</span>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-purple-700 bg-clip-text text-transparent">
-              Shortlist
-            </h1>
-          </div>
-          <div></div>
-        </div>
-      </nav>
-
-      {/* Content */}
+    <Layout>
+{/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header Card */}
         <div className="bg-white rounded-xl shadow-md p-8 mb-8 border-l-4 border-purple-500">
@@ -237,6 +219,6 @@ export default function RecruiterShortlist() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }

@@ -7,7 +7,7 @@ MODES:
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Tuple, cast
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from enum import Enum
 
@@ -314,18 +314,50 @@ def calculate_match_score(
         except (json.JSONDecodeError, TypeError):
             pass
     
-    # ===== COMPONENT 4: DATA QUALITY BOOSTING =====
+    # ===== COMPONENT 4: EDUCATION SIGNAL =====
+    education_score = 50.0
+    if candidate.extracted_education:
+        import json
+        try:
+            education_items = json.loads(candidate.extracted_education)
+            education_text = " ".join(str(e).lower() for e in education_items) if isinstance(education_items, list) else ""
+            if any(keyword in education_text for keyword in ["phd", "doctor", "doctorate"]):
+                education_score = 95.0
+            elif any(keyword in education_text for keyword in ["master", "msc", "mba", "engineer"]):
+                education_score = 85.0
+            elif any(keyword in education_text for keyword in ["bachelor", "licence", "degree"]):
+                education_score = 75.0
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # ===== COMPONENT 5: DATA QUALITY BOOSTING =====
     quality_boost = 1.0
     if candidate.extraction_quality_score and candidate.extraction_quality_score > 0:
         # High quality extractions get a boost (up to 10%)
         quality_boost = 1.0 + (candidate.extraction_quality_score / 1000.0)
-    
+
     # ===== FINAL SCORE CALCULATION =====
-    # Weights: skills (50%), experience (25%), company (15%), data quality (10%)
+    # Dynamic business weighting based on signal richness.
+    weights = {
+        "skills": 0.50,
+        "experience": 0.20,
+        "education": 0.20,
+        "company": 0.10,
+    }
+
+    if not candidate.extracted_education:
+        weights["skills"] += 0.10
+        weights["education"] -= 0.10
+
+    if not candidate.extracted_companies:
+        weights["skills"] += 0.05
+        weights["company"] -= 0.05
+
     final_score = (
-        skill_score * 0.50 +
-        experience_score * 0.25 +
-        company_relevance_score * 0.15
+        skill_score * weights["skills"] +
+        experience_score * weights["experience"] +
+        education_score * weights["education"] +
+        company_relevance_score * weights["company"]
     ) * quality_boost
     
     final_score = min(100.0, max(0.0, final_score))
@@ -335,8 +367,10 @@ def calculate_match_score(
         "component_scores": {
             "skills": min(100, skill_score),
             "experience_level": experience_score,
+            "education": education_score,
             "company_relevance": company_relevance_score,
-            "data_quality_boost": (quality_boost - 1.0) * 100
+            "data_quality_boost": (quality_boost - 1.0) * 100,
+            "dynamic_weights": weights,
         },
         "matched_skills": matched_skills_count,
         "total_skills": len(criteria_skills),
@@ -624,8 +658,8 @@ async def calculate_match(
         for cs in criteria_skills
     ]
 
-    score = calculate_match_score(candidate, criteria_skills_dict)
-    explanation = (
+    score, details = calculate_match_score(candidate, criteria_skills_dict)
+    explanation = details.get("details") or (
         f"Matched {len([s for s in criteria_skills_dict if s['name'] in [cs.skill.name for cs in candidate.candidate_skills]])} required skills"
         if criteria_skills_dict else "No skills defined for criteria"
     )
@@ -643,19 +677,6 @@ async def calculate_match(
     return match_result
 
 
-@router.get("/{criteria_id}/results", response_model=List[MatchResultResponse])
-async def get_criteria_results(
-    criteria_id: int,
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db)
-):
-    """Get all match results for a specific criteria."""
-    results = db.query(MatchResult).filter(
-        MatchResult.criteria_id == criteria_id
-    ).offset(skip).limit(limit).all()
-    return results
-
 
 # ============================================================================
 # MODE 2: GÉNÉRATION - Generate ideal profile and match
@@ -671,31 +692,39 @@ async def generate_ideal_profile(
     
     Utilise un générateur de profil local basé sur des règles simples.
     """
-    # Return a simple profile structure without blocking calls
-    generated_skills = []
+    generated_profile = {}
 
-    if SKILL_EXTRACTOR_AVAILABLE:
+    if PROFILE_GENERATOR_AVAILABLE:
+        try:
+            generated_profile = ProfileGenerator.generate_from_text(request.description)
+        except Exception:
+            generated_profile = {}
+
+    # Safety fallback if model is unavailable or returns malformed output.
+    if not isinstance(generated_profile, dict):
+        generated_profile = {}
+
+    generated_skills = generated_profile.get("ideal_skills") or []
+    if not generated_skills and SKILL_EXTRACTOR_AVAILABLE:
         extractor = SkillExtractor()
         extracted = extractor.extract_skills(request.description, threshold=85)
-        generated_skills = [
-            {"name": item["name"], "weight": 90, "level": "Advanced"}
-            for item in extracted[:8]
-        ]
+        generated_skills = [{"name": item["name"], "weight": 90, "level": "Advanced"} for item in extracted[:8]]
 
     if not generated_skills:
         generated_skills = [
             {"name": "Communication", "weight": 80, "level": "Advanced"},
             {"name": "Problem Solving", "weight": 80, "level": "Advanced"},
-            {"name": "Team Work", "weight": 70, "level": "Intermediate"}
+            {"name": "Team Work", "weight": 70, "level": "Intermediate"},
         ]
 
     return {
         "title": request.job_title,
         "description": request.description,
         "ideal_skills": generated_skills,
-        "ideal_experience_years": 5,
-        "ideal_education": "Bachelor's degree or equivalent",
-        "industries": []
+        "ideal_experience_years": generated_profile.get("ideal_experience_years", 5),
+        "ideal_education": generated_profile.get("ideal_education", "Bachelor's degree or equivalent"),
+        "ideal_languages": generated_profile.get("ideal_languages", []),
+        "industries": generated_profile.get("industries", []),
     }
 
 

@@ -31,6 +31,10 @@ export const authApi = {
     const response = await apiClient.post('/api/auth/login', data);
     if (response.data.access_token) {
       localStorage.setItem('access_token', response.data.access_token);
+      localStorage.setItem('user_role', response.data.user.role);
+      localStorage.setItem('user_name', response.data.user.full_name);
+      localStorage.setItem('user_id', String(response.data.user.id));
+      localStorage.setItem('user', JSON.stringify(response.data.user));
     }
     return response.data;
   },
@@ -39,6 +43,10 @@ export const authApi = {
     const response = await apiClient.post('/api/auth/register', data);
     if (response.data.access_token) {
       localStorage.setItem('access_token', response.data.access_token);
+      localStorage.setItem('user_role', response.data.user.role);
+      localStorage.setItem('user_name', response.data.user.full_name);
+      localStorage.setItem('user_id', String(response.data.user.id));
+      localStorage.setItem('user', JSON.stringify(response.data.user));
     }
     return response.data;
   },
@@ -50,6 +58,9 @@ export const authApi = {
 
   logout: async (): Promise<void> => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('user_id');
     localStorage.removeItem('user');
   },
 };

@@ -4,14 +4,39 @@ Combines PDF text extraction + NER structured data extraction
 """
 
 import fitz  # PyMuPDF
+import io
 import json
 import os
 import re
 import logging
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Any, Dict, Optional, List
 from dataclasses import dataclass
 from datetime import datetime
+
+try:
+    import pdfplumber  # type: ignore
+    PDFPLUMBER_AVAILABLE = True
+except Exception:
+    PDFPLUMBER_AVAILABLE = False
+
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except Exception:
+    PIL_AVAILABLE = False
+
+try:
+    import pytesseract  # type: ignore
+    TESSERACT_AVAILABLE = True
+except Exception:
+    TESSERACT_AVAILABLE = False
+
+try:
+    from ai_module.nlp.cv_parser import HFResumeNERParser
+    HF_NER_PARSER_AVAILABLE = True
+except ImportError:
+    HF_NER_PARSER_AVAILABLE = False
 
 try:
     from ai_module.nlp.resume_ner_extractor import ResumeNERExtractor
@@ -50,6 +75,15 @@ class CVExtractionService:
         self.cv_cleaner = CVCleaner()
         self.skill_extractor = EnhancedSkillExtractor(load_ner=False)  # Separate NER
         self.debug_enabled = os.getenv("CV_EXTRACTION_DEBUG", "0") == "1"
+        self.hf_ner_model_name = os.getenv("HF_CV_NER_MODEL", "dslim/bert-base-NER")
+        self.hf_parser = None
+
+        if HF_NER_PARSER_AVAILABLE:
+            try:
+                self.hf_parser = HFResumeNERParser(model_name=self.hf_ner_model_name)
+            except Exception as e:
+                print(f"⚠️ HF NER parser not available: {e}")
+                self.hf_parser = None
         
         try:
             self.ner_extractor = ResumeNERExtractor()
@@ -57,6 +91,9 @@ class CVExtractionService:
         except Exception as e:
             print(f"⚠️ NER not available: {e}")
             self.ner_available = False
+
+        self._email_re = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+        self._phone_digits_re = re.compile(r"\D")
     
     def extract_from_pdf(self, file_path: str) -> CVExtractionResult:
         """
@@ -112,12 +149,25 @@ class CVExtractionService:
         
         try:
             normalized_text = self._normalize_text_for_extraction(text)
+            hf_structured: Dict = {}
+            hf_quality = 0.0
+
+            # Run modern HF parser first (high precision on identity entities),
+            # then merge with the richer legacy extractor output.
+            if self.hf_parser is not None and self.hf_parser.available:
+                hf_structured, hf_quality = self.hf_parser.extract_structured_profile(normalized_text)
 
             if self.debug_enabled:
                 logger.info("TEXT EXTRACTED (preview): %s", normalized_text[:1000])
 
             structured = self.ner_extractor.extract_structured_profile(normalized_text)
             quality = self._compute_quality_score(structured)
+
+            if hf_structured:
+                structured = self._merge_structured_profiles(base=structured, hf=hf_structured)
+
+            structured = self._postprocess_structured(structured)
+            quality = max(quality, hf_quality, self._compute_quality_score(structured))
 
             if self.debug_enabled:
                 entity_counts = {
@@ -135,6 +185,232 @@ class CVExtractionService:
         except Exception as e:
             print(f"⚠️ Structured extraction failed: {e}")
             return {}, 0
+
+    def _merge_structured_profiles(self, base: Dict, hf: Dict) -> Dict:
+        """Merge legacy and HF structured outputs while preserving richer fields."""
+        merged = dict(base or {})
+
+        # Fill scalar identity fields only when missing in base.
+        for key in ["full_name", "name", "email", "phone", "linkedin_url", "profile_summary"]:
+            if not merged.get(key) and hf.get(key):
+                merged[key] = hf[key]
+
+        # Merge list fields with de-duplication while preserving order.
+        list_keys = [
+            "emails", "phones", "companies", "job_titles", "education", "skills",
+            "languages", "soft_skills", "interests", "certifications", "projects",
+            "experiences", "linkedin_urls", "github_urls", "portfolio_urls", "locations",
+        ]
+        for key in list_keys:
+            base_list = merged.get(key) if isinstance(merged.get(key), list) else []
+            hf_list = hf.get(key) if isinstance(hf.get(key), list) else []
+
+            combined = []
+            seen = set()
+            for item in base_list + hf_list:
+                marker = json.dumps(item, sort_keys=True, ensure_ascii=False) if isinstance(item, dict) else str(item).strip().lower()
+                if not marker or marker in seen:
+                    continue
+                seen.add(marker)
+                combined.append(item)
+
+            if combined:
+                merged[key] = combined
+
+        # Keep extraction metadata traceable.
+        base_meta = merged.get("extraction_metadata") if isinstance(merged.get("extraction_metadata"), dict) else {}
+        hf_meta = hf.get("extraction_metadata") if isinstance(hf.get("extraction_metadata"), dict) else {}
+        merged["extraction_metadata"] = {
+            **base_meta,
+            **hf_meta,
+            "fusion": "legacy+hf",
+            "models": list(dict.fromkeys([m for m in [base_meta.get("model"), hf_meta.get("model")] if m])),
+        }
+
+        return merged
+
+    def _postprocess_structured(self, structured: Dict) -> Dict:
+        """Normalize and validate extracted entities to improve precision."""
+        cleaned = dict(structured or {})
+
+        cleaned["emails"] = self._clean_emails(cleaned.get("emails"), cleaned.get("email"))
+        cleaned["email"] = cleaned["emails"][0] if cleaned["emails"] else None
+
+        cleaned["phones"] = self._clean_phones(cleaned.get("phones"), cleaned.get("phone"))
+        cleaned["phone"] = cleaned["phones"][0] if cleaned["phones"] else None
+
+        cleaned["full_name"] = self._clean_name(cleaned.get("full_name") or cleaned.get("name"))
+        cleaned["name"] = cleaned["full_name"]
+
+        cleaned["companies"] = self._clean_labeled_list(
+            cleaned.get("companies"),
+            max_items=8,
+            min_len=2,
+            max_len=80,
+            banned_tokens={"linkedin", "github", "gmail", "hotmail", "outlook", "formation", "education", "skills", "competences"},
+        )
+        cleaned["job_titles"] = self._clean_labeled_list(
+            cleaned.get("job_titles"),
+            max_items=8,
+            min_len=3,
+            max_len=80,
+            banned_tokens={"linkedin", "github", "gmail", "hotmail", "outlook", "formation", "education"},
+        )
+        cleaned["education"] = self._clean_labeled_list(
+            cleaned.get("education"),
+            max_items=6,
+            min_len=3,
+            max_len=120,
+            banned_tokens={"linkedin", "github", "gmail", "hotmail", "outlook"},
+            allow_years=True,
+        )
+        cleaned["skills"] = self._clean_labeled_list(
+            cleaned.get("skills"),
+            max_items=30,
+            min_len=2,
+            max_len=60,
+            banned_tokens={"linkedin", "github", "gmail", "hotmail", "outlook"},
+        )
+        cleaned["languages"] = self._clean_labeled_list(
+            cleaned.get("languages"),
+            max_items=8,
+            min_len=2,
+            max_len=30,
+            banned_tokens=set(),
+        )
+        cleaned["soft_skills"] = self._clean_labeled_list(
+            cleaned.get("soft_skills"),
+            max_items=20,
+            min_len=2,
+            max_len=60,
+            banned_tokens={"linkedin", "github", "gmail", "hotmail", "outlook"},
+        )
+        cleaned["projects"] = self._clean_labeled_list(
+            cleaned.get("projects"),
+            max_items=15,
+            min_len=4,
+            max_len=180,
+            banned_tokens={"linkedin", "github", "gmail", "hotmail", "outlook"},
+            allow_years=True,
+        )
+        cleaned["certifications"] = self._clean_labeled_list(
+            cleaned.get("certifications"),
+            max_items=15,
+            min_len=3,
+            max_len=140,
+            banned_tokens={"linkedin", "github", "gmail", "hotmail", "outlook"},
+            allow_years=True,
+        )
+
+        metadata = cleaned.get("extraction_metadata") if isinstance(cleaned.get("extraction_metadata"), dict) else {}
+        metadata["postprocessed"] = True
+        cleaned["extraction_metadata"] = metadata
+
+        return cleaned
+
+    def _clean_name(self, name: Any) -> Optional[str]:
+        value = str(name or "").strip()
+        if not value:
+            return None
+        if "@" in value or "http" in value.lower():
+            return None
+        if any(ch.isdigit() for ch in value):
+            return None
+        words = [w for w in re.split(r"\s+", value) if w]
+        if len(words) < 2 or len(words) > 4:
+            return None
+        return " ".join(word.capitalize() for word in words)
+
+    def _clean_emails(self, emails: Any, scalar_email: Any) -> List[str]:
+        values = []
+        if isinstance(emails, list):
+            values.extend(str(v).strip().lower() for v in emails)
+        if scalar_email:
+            values.append(str(scalar_email).strip().lower())
+
+        unique = []
+        seen = set()
+        for email in values:
+            if not email or email in seen:
+                continue
+            if not self._email_re.match(email):
+                continue
+            seen.add(email)
+            unique.append(email)
+        return unique[:5]
+
+    def _clean_phones(self, phones: Any, scalar_phone: Any) -> List[str]:
+        values = []
+        if isinstance(phones, list):
+            values.extend(str(v).strip() for v in phones)
+        if scalar_phone:
+            values.append(str(scalar_phone).strip())
+
+        unique = []
+        seen = set()
+        for phone in values:
+            if not phone:
+                continue
+            digits = self._phone_digits_re.sub("", phone)
+            if len(digits) < 10 or len(digits) > 15:
+                continue
+            if digits in seen:
+                continue
+            seen.add(digits)
+            unique.append(phone)
+        return unique[:3]
+
+    def _clean_labeled_list(
+        self,
+        values: Any,
+        *,
+        max_items: int,
+        min_len: int,
+        max_len: int,
+        banned_tokens: set,
+        allow_years: bool = False,
+    ) -> List[Any]:
+        if not isinstance(values, list):
+            return []
+
+        cleaned: List[Any] = []
+        seen = set()
+
+        for item in values:
+            if isinstance(item, dict):
+                marker = json.dumps(item, sort_keys=True, ensure_ascii=False)
+                if marker in seen:
+                    continue
+                seen.add(marker)
+                cleaned.append(item)
+                if len(cleaned) >= max_items:
+                    break
+                continue
+
+            value = str(item or "").strip()
+            if not value:
+                continue
+
+            normalized = re.sub(r"\s+", " ", value).strip()
+            lowered = normalized.lower()
+
+            if len(normalized) < min_len or len(normalized) > max_len:
+                continue
+            if "@" in lowered or "http" in lowered:
+                continue
+            if (not allow_years) and re.search(r"\b(19|20)\d{2}\b", lowered):
+                continue
+            if any(token in lowered for token in banned_tokens):
+                continue
+
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            cleaned.append(normalized)
+            if len(cleaned) >= max_items:
+                break
+
+        return cleaned
 
     def _normalize_text_for_extraction(self, text: str) -> str:
         """Normalize noisy PDF extraction output to improve entity detection."""
@@ -262,17 +538,159 @@ class CVExtractionService:
 
 
 def extract_text_from_pdf(file_path: str) -> str:
-    """Extract text from PDF file"""
+    """Extract text from PDF using multiple strategies and keep the best result."""
+    candidates: List[str] = []
+
     try:
         doc = fitz.open(file_path)
-        text_parts = []
+        text_parts_default = []
+        text_parts_block = []
         for page in doc:
-            text_parts.append(page.get_text())
+            text_parts_default.append(page.get_text())
+            text_parts_block.append(page.get_text("blocks"))
         doc.close()
-        return "\n".join(text_parts).strip()
+
+        # Default extraction.
+        candidates.append("\n".join(text_parts_default).strip())
+
+        # Block extraction often improves OCR-like and layout-heavy CVs.
+        block_lines = []
+        for page_blocks in text_parts_block:
+            if not isinstance(page_blocks, list):
+                continue
+            sorted_blocks = sorted(page_blocks, key=lambda b: (b[1], b[0]))
+            for block in sorted_blocks:
+                if len(block) >= 5 and isinstance(block[4], str):
+                    value = block[4].strip()
+                    if value:
+                        block_lines.append(value)
+        if block_lines:
+            candidates.append("\n".join(block_lines).strip())
     except Exception as e:
         print(f"❌ PDF extraction failed: {e}")
+
+    if PDFPLUMBER_AVAILABLE:
+        try:
+            with pdfplumber.open(file_path) as pdf:
+                pages = [page.extract_text() or "" for page in pdf.pages]
+                candidates.append("\n".join(pages).strip())
+        except Exception:
+            pass
+
+    candidates = [text for text in candidates if text and text.strip()]
+    if not candidates:
         return ""
+
+    best_text = max(candidates, key=_score_extracted_text)
+    best_score = _score_extracted_text(best_text)
+
+    # OCR fallback for scanned/image-only PDFs.
+    ocr_mode = os.getenv("CV_OCR_MODE", "auto").strip().lower()
+    ocr_threshold = int(os.getenv("CV_OCR_TRIGGER_SCORE", "700"))
+    should_try_ocr = (
+        ocr_mode == "aggressive"
+        or ocr_mode == "ultra"
+        or (ocr_mode == "auto" and best_score < ocr_threshold)
+    )
+
+    if should_try_ocr and TESSERACT_AVAILABLE and PIL_AVAILABLE:
+        ocr_text = _extract_text_from_pdf_ocr(file_path)
+        if ocr_text:
+            ocr_score = _score_extracted_text(ocr_text)
+            if ocr_score > best_score:
+                best_text = ocr_text
+                best_score = ocr_score
+
+        if ocr_mode == "ultra":
+            ultra_text = _extract_text_from_pdf_ultra(file_path)
+            if ultra_text:
+                ultra_score = _score_extracted_text(ultra_text)
+                if ultra_score > best_score:
+                    return ultra_text
+
+    return best_text
+
+
+def _score_extracted_text(text: str) -> int:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    alpha = sum(1 for ch in text if ch.isalpha())
+    emails = len(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text))
+    phones = len(re.findall(r"\+?\d[\d\s().-]{7,}\d", text))
+    section_hits = len(re.findall(r"\b(experience|education|skills|profil|formation|competences|projects)\b", text.lower()))
+    return alpha + (emails * 200) + (phones * 120) + (section_hits * 80) + (len(lines) * 3)
+
+
+def _extract_text_from_pdf_ocr(file_path: str) -> str:
+    """OCR fallback: render PDF pages to images and run Tesseract."""
+    page_texts: List[str] = []
+    max_pages = int(os.getenv("CV_OCR_MAX_PAGES", "8"))
+    dpi = int(os.getenv("CV_OCR_DPI", "250"))
+    lang = os.getenv("CV_OCR_LANG", "fra+eng")
+    psm = os.getenv("CV_OCR_PSM", "6").strip()
+    oem = os.getenv("CV_OCR_OEM", "1").strip()
+    tesseract_config = f"--oem {oem} --psm {psm}"
+
+    try:
+        doc = fitz.open(file_path)
+        page_count = min(len(doc), max_pages)
+        for idx in range(page_count):
+            page = doc.load_page(idx)
+            text = _extract_page_ocr_text(page=page, dpi=dpi, lang=lang, tesseract_config=tesseract_config)
+            if text and text.strip():
+                page_texts.append(text.strip())
+        doc.close()
+    except Exception:
+        return ""
+
+    return "\n\n".join(page_texts).strip()
+
+
+def _extract_text_from_pdf_ultra(file_path: str) -> str:
+    """Ultra mode: page-wise OCR only on weak native-extraction pages."""
+    max_pages = int(os.getenv("CV_OCR_MAX_PAGES", "8"))
+    dpi = int(os.getenv("CV_OCR_DPI", "250"))
+    lang = os.getenv("CV_OCR_LANG", "fra+eng")
+    psm = os.getenv("CV_OCR_PSM", "6").strip()
+    oem = os.getenv("CV_OCR_OEM", "1").strip()
+    page_trigger_score = int(os.getenv("CV_OCR_PAGE_TRIGGER_SCORE", "120"))
+    tesseract_config = f"--oem {oem} --psm {psm}"
+
+    merged_pages: List[str] = []
+
+    try:
+        doc = fitz.open(file_path)
+        page_count = min(len(doc), max_pages)
+        for idx in range(page_count):
+            page = doc.load_page(idx)
+            native_text = (page.get_text() or "").strip()
+            native_score = _score_extracted_text(native_text)
+
+            selected_text = native_text
+            if native_score < page_trigger_score:
+                ocr_text = _extract_page_ocr_text(page=page, dpi=dpi, lang=lang, tesseract_config=tesseract_config)
+                if ocr_text:
+                    ocr_text = ocr_text.strip()
+                    ocr_score = _score_extracted_text(ocr_text)
+                    if ocr_score > native_score:
+                        selected_text = ocr_text
+
+            if selected_text:
+                merged_pages.append(selected_text)
+
+        doc.close()
+    except Exception:
+        return ""
+
+    return "\n\n".join(merged_pages).strip()
+
+
+def _extract_page_ocr_text(page: Any, dpi: int, lang: str, tesseract_config: str) -> str:
+    """Run OCR on a single PDF page rendered as image."""
+    zoom = dpi / 72.0
+    matrix = fitz.Matrix(zoom, zoom)
+    pix = page.get_pixmap(matrix=matrix, alpha=False)
+    image = Image.open(io.BytesIO(pix.tobytes("png")))
+    return pytesseract.image_to_string(image, lang=lang, config=tesseract_config)
 
 
 def save_text_as_txt(text: str, output_dir: str, base_name: str) -> str:

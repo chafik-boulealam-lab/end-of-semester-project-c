@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useCallback } from "react";
 import { Send, MessageCircle, Loader } from "lucide-react";
 import ChatMessage from "@/components/ChatMessage";
 import { chatApi, type ChatHistoryEntry } from "@/services/chat";
 import { criteriaApi } from "@/services/criteria";
 import { matchingApi, type CriteriaMatchResult } from "@/services/matching";
+import Layout from '@/components/Layout';
 
 interface ChatEntry {
   id: string;
@@ -28,35 +30,39 @@ export default function ChatbotPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [topCandidates, setTopCandidates] = useState<CriteriaMatchResult[]>([]);
   const [currentCriteria, setCurrentCriteria] = useState<{ id: number; title: string; required_skills: Array<{ name: string; weight: number }> } | null>(null);
+  const [suggestedActions, setSuggestedActions] = useState<string[]>([]);
 
   useEffect(() => {
     // Scroll to bottom on new messages
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    // Fetch top candidates on mount
-    fetchTopCandidates();
-  }, []);
-
-  const fetchTopCandidates = async () => {
+  const fetchTopCandidates = useCallback(async () => {
     try {
       const criteriaResponse = await criteriaApi.getCriteria();
       const latestCriteria = criteriaResponse.data[0];
       if (!latestCriteria) {
         setCurrentCriteria(null);
         setTopCandidates([]);
-        return;
+        return { currentCriteria: null, topCandidates: [] as CriteriaMatchResult[] };
       }
 
       setCurrentCriteria(latestCriteria);
 
       const rankingResponse = await matchingApi.getCriteriaMatchingResults(latestCriteria.id);
-      setTopCandidates(rankingResponse.data.slice(0, 3));
+      const bestCandidates = rankingResponse.data.slice(0, 10);
+      setTopCandidates(bestCandidates);
+      return { currentCriteria: latestCriteria, topCandidates: bestCandidates };
     } catch (error) {
       console.error("Error fetching candidates:", error);
+      return { currentCriteria, topCandidates };
     }
-  };
+  }, [currentCriteria, topCandidates]);
+
+  useEffect(() => {
+    // Fetch top candidates on mount
+    void fetchTopCandidates();
+  }, [fetchTopCandidates]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +80,10 @@ export default function ChatbotPage() {
     setLoading(true);
 
     try {
+      const liveContext = await fetchTopCandidates();
+      const effectiveCriteria = liveContext?.currentCriteria ?? currentCriteria;
+      const effectiveCandidates = liveContext?.topCandidates ?? topCandidates;
+
       const history: ChatHistoryEntry[] = [...messages, userMessage].slice(-8).map(message => ({
         role: message.type,
         content: message.content,
@@ -83,9 +93,9 @@ export default function ChatbotPage() {
       const response = await chatApi.sendMessage({
         message: userMessage.content,
         context: {
-          current_criteria: currentCriteria,
-          current_criteria_id: currentCriteria?.id,
-          top_candidates: topCandidates,
+          current_criteria: effectiveCriteria,
+          current_criteria_id: effectiveCriteria?.id,
+          top_candidates: effectiveCandidates,
           history,
         }
       });
@@ -96,9 +106,11 @@ export default function ChatbotPage() {
         content: response.data.response,
         timestamp: new Date()
       };
+      setSuggestedActions(response.data.actions || []);
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error("Error sending message:", error);
+      setSuggestedActions([]);
       const errorMessage: ChatEntry = {
         id: (Date.now() + 2).toString(),
         type: "assistant",
@@ -112,7 +124,8 @@ export default function ChatbotPage() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-gray-50 to-gray-100">
+    <Layout>
+    <div className="h-full flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
         <div className="flex items-center gap-3">
@@ -163,8 +176,23 @@ export default function ChatbotPage() {
         <p className="text-xs text-gray-500 mt-2">
           💡 Conseil: Essayez &quot;Explique pourquoi Ahmed a un score de 95%&quot; ou &quot;Compare les 3 candidats&quot;
         </p>
+        {suggestedActions.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {suggestedActions.map(action => (
+              <button
+                key={action}
+                type="button"
+                onClick={() => setInput(action)}
+                className="text-sm px-3 py-2 rounded-full border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
+              >
+                {action}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
+    </Layout>
   );
 }
 

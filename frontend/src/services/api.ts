@@ -1,10 +1,11 @@
 import axios from 'axios';
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const defaultTimeoutMs = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 30000);
 
 export const apiClient = axios.create({
   baseURL: apiUrl,
-  timeout: 10000,
+  timeout: defaultTimeoutMs,
 });
 
 // Request interceptor

@@ -7,6 +7,7 @@ import { candidatesApi, Candidate } from '@/services/candidates';
 import { favoritesApi } from '@/services/favorites';
 import { getErrorMessage } from '@/utils/errorHandler';
 import { SkeletonProfile } from '@/components/SkeletonLoader';
+import Layout from '@/components/Layout';
 
 export default function CandidateDetail() {
   const params = useParams();
@@ -65,30 +66,28 @@ export default function CandidateDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <nav className="bg-white shadow-sm border-b">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">Profil Candidat</h1>
-          </div>
-        </nav>
-        <div className="max-w-4xl mx-auto px-4 py-8">
+      <Layout>
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">Profil Candidat</h1>
           <SkeletonProfile />
         </div>
-      </div>
+      </Layout>
     );
   }
 
   if (error || !candidate) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-3xl mb-4">❌</div>
-          <p className="text-gray-600">{error || 'Candidat non trouvé'}</p>
-          <Link href="/recruiter/dashboard" className="text-blue-600 hover:text-blue-700 mt-4 inline-block">
-            ← Retour au Dashboard
-          </Link>
+      <Layout>
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="text-3xl mb-4">❌</div>
+            <p className="text-gray-600">{error || 'Candidat non trouvé'}</p>
+            <Link href="/candidates" className="text-blue-600 hover:text-blue-700 mt-4 inline-block">
+              ← Retour aux candidats
+            </Link>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
@@ -99,30 +98,26 @@ export default function CandidateDetail() {
   const extractedEducation = parseJsonList(candidate.extracted_education);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
-          <Link href="/recruiter/dashboard" className="text-gray-600 hover:text-gray-900">
-            ← Retour
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Profil Candidat</h1>
-          <button
-            onClick={toggleFavorite}
-            disabled={addingFavorite}
-            aria-pressed={isFavorite}
-            aria-label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-            className={`text-2xl transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-400 rounded p-1 ${
-              isFavorite ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-400 hover:text-yellow-400'
-            }`}
-          >
-            ★
-          </button>
-        </div>
-      </nav>
+    <Layout>
+      {/* Header */}
+      <div className="max-w-4xl mx-auto mb-6 flex justify-between items-center">
+        <Link href="/candidates" className="text-sm text-gray-500 hover:text-indigo-600">← Retour aux candidats</Link>
+        <h1 className="text-2xl font-bold text-gray-900">Profil Candidat</h1>
+        <button
+          onClick={toggleFavorite}
+          disabled={addingFavorite}
+          aria-pressed={isFavorite}
+          aria-label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+          className={`text-2xl transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-400 rounded p-1 ${
+            isFavorite ? 'text-yellow-400 hover:text-yellow-500' : 'text-gray-400 hover:text-yellow-400'
+          }`}
+        >
+          ★
+        </button>
+      </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto">
         <div className="grid md:grid-cols-3 gap-6">
           {/* Main Info */}
           <div className="md:col-span-2 space-y-6">
@@ -306,6 +301,6 @@ export default function CandidateDetail() {
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

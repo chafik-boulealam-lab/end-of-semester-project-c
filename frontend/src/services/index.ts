@@ -6,3 +6,4 @@ export { criteriaApi, type Criteria, type CriteriaCreatePayload, type CriteriaUp
 export { jobsApi, type JobCriteria } from './jobs';
 export { matchingApi, type MatchResult, type CriteriaMatchResult, type SkillBreakdown } from './matching';
 export { chatApi, type ChatRequestPayload, type ChatResponsePayload, type ChatContext, type ChatHistoryEntry } from './chat';
+export { favoritesApi, type Favorite } from './favorites';

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@/components/Layout";
 import ScoreGauge from "@/components/ScoreGauge";
 import { useApi } from "@/hooks/useApi";
@@ -24,7 +24,6 @@ import {
   Legend,
   Pie,
   PieChart,
-  ResponsiveContainer,
   Tooltip,
 } from "recharts";
 
@@ -46,6 +45,31 @@ export default function MatchingPage() {
   const [loadingCriteria, setLoadingCriteria] = useState(false);
   const [results, setResults] = useState<CriteriaMatchResult[]>([]);
   const [error, setError] = useState("");
+  const [isChartMounted, setIsChartMounted] = useState(false);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    setIsChartMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!chartRef.current) {
+      return;
+    }
+
+    const node = chartRef.current;
+    const updateSize = () => {
+      const rect = node.getBoundingClientRect();
+      setChartSize({ width: Math.floor(rect.width), height: Math.floor(rect.height) });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, []);
 
   const suggestions = useMemo(() => {
     const query = skillQuery.trim().toLowerCase();
@@ -388,10 +412,10 @@ export default function MatchingPage() {
               <div className="rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">Total: {totalWeight}%</div>
             </div>
 
-            <div className="h-80 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              {pieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
+            <div ref={chartRef} className="h-80 min-w-0 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              {isChartMounted && pieData.length > 0 && chartSize.width > 0 && chartSize.height > 0 ? (
+                <div className="flex h-full items-center justify-center">
+                  <PieChart width={Math.max(280, chartSize.width - 32)} height={Math.max(240, chartSize.height - 24)}>
                     <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={60} outerRadius={110} paddingAngle={3}>
                       {pieData.map((entry, index) => (
                         <Cell key={entry.name} fill={palette[index % palette.length]} />
@@ -400,7 +424,7 @@ export default function MatchingPage() {
                     <Tooltip />
                     <Legend />
                   </PieChart>
-                </ResponsiveContainer>
+                </div>
               ) : (
                 <div className="flex h-full items-center justify-center text-sm text-slate-500">Ajoutez des compétences pour voir la distribution.</div>
               )}
@@ -414,10 +438,17 @@ export default function MatchingPage() {
                 )}
                 {criteriaLoading && <div className="rounded-2xl border border-slate-200 px-4 py-6 text-sm text-slate-500">Chargement des critères...</div>}
                 {(criteriaList || []).map(criteria => (
-                  <button
+                  <div
                     key={criteria.id}
-                    type="button"
                     onClick={() => loadCriteria(criteria)}
+                    onKeyDown={event => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        void loadCriteria(criteria);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
                     className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
                       selectedCriteriaId === criteria.id
                         ? "border-sky-300 bg-sky-50 shadow-sm"
@@ -453,7 +484,7 @@ export default function MatchingPage() {
                       </div>
                     </div>
                     {criteria.description && <div className="mt-2 text-sm text-slate-500">{criteria.description}</div>}
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
