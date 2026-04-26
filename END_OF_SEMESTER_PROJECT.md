@@ -1,78 +1,116 @@
-### Projet de fin de semestre — Consignes pour les étudiants
+﻿# Projet de fin de semestre — Consignes détaillées (Étudiants)
 
-Bonjour à toutes et à tous,
+## Introduction
 
-Nous lançons officiellement les projets de fin de semestre. Cette année, vous travaillez selon des standards professionnels : formez des groupes de 3 à 5 étudiants et produisez un projet déployé, testé et documenté.
-
----
-
-## Contraintes techniques obligatoires
-
-- **Langage principal :** Le cœur logique de l'application doit être développé en **C**.
-- **Architecture :** Séparation Backend / Frontend.
-- **Intégration IA (obligatoire) :** Intégrez au moins une API d'IA (chatbot, reconnaissance vocale, analyse d'image, traduction, etc.). Plusieurs fonctionnalités IA sont encouragées.
-- **Base de données :** Utilisez des bases cloud pour les projets déployés — **Supabase** ou **MongoDB**. SQLite est autorisé uniquement pour les applications hors-ligne (p. ex. stockage local); les projets déployés doivent utiliser une base cloud.
-- **Déploiement :** Le produit final doit être déployé et accessible publiquement (web, mobile ou desktop).
-- **GitHub :** Chaque étudiant doit montrer une activité visible (commits/branches/push). Invitez le Prof. Chafik Boulealam dans votre dépôt.
+Ce document décrit, de façon exhaustive et pédagogique, les exigences, les livrables et les consignes de soutenance pour le projet de fin de semestre. Travaillez en groupes de 3 à 5 étudiants. L'objectif est de produire un projet professionnel, testé, documenté et déployé.
 
 ---
 
-## Étapes à suivre (pour les étudiants)
+## Jury — Membres
 
-1. Constituez votre groupe (3–5 étudiants).
-2. Créez un dépôt sous l'organisation `chafik-boulealam-lab` avec la convention `project-<groupe>-<sujet>`.
-3. Ajoutez un `README.md` contenant la liste des membres, leurs rôles et le lien de déploiement.
-4. Implémentez le projet, intégrez les services IA et la base cloud, déployez le service.
-5. Invitez le Prof. Chafik Boulealam en tant que collaborateur sur votre dépôt.
+*Liste des membres du jury (à compléter) :* 
 
----
+- [Insert Jury Names Here]
 
-## Modèle de `README.md` (à adapter)
-
-Titre : <Titre du projet>
-
-Membres :
-- Nom (rôle, pseudo GitHub)
-
-Description :
-- Brève description du projet, stack technique, fonctionnalités IA et lien de déploiement.
-
-Checklist obligatoire :
-- Cœur logique en C : indiquer l'emplacement du code C.
-- Base cloud : préciser Supabase ou MongoDB (ne pas committer de credentials).
-- APIs IA : lister les services utilisés et où ils sont intégrés.
-- Lien de déploiement : URL publique vers l'application.
-
-Comment exécuter (court) :
-1. Étapes de build (installer dépendances, compiler backend C, lancer le frontend)
-2. Exemple : `make build && ./bin/app`
-
-Liens :
-- DEMO : https://<deployed-url>
-- Publication LinkedIn : <URL de la publication LinkedIn>
+Suggestions (à titre informatif) : Prof. Mehdi Iraqi Houssaini; Prof. Othman Mekouar; Dr. Chafik Boulealam; Mekouar Khalid; Mekouar Youssef.
 
 ---
 
-## Présentation & exigences de la démonstration finale
+## Contraintes techniques (obligatoires)
 
-- Préparez une présentation claire et visuelle, limitée en texte; évitez de lire les diapositives.
-- La première diapositive doit inclure : logo ESISA, nom du projet, membres de l'équipe et noms du professeur/jury.
-- Enregistrez une vidéo de démonstration et fournissez le lien dans le `README.md`.
-- Le dépôt GitHub doit montrer des commits professionnels de tous les membres (activité distribuée et historique de branches propre).
-- Après la soutenance, postez la vidéo sur LinkedIn et ajoutez le lien dans le `README.md`.
+- **Langage principal :** Le cœur logique doit être développé en **C**. Les bindings, wrappers ou services complémentaires peuvent être en d'autres langages.
+- **Architecture :** Respectez une séparation claire Backend / Frontend. Le backend (logique métier, traitements IA côté serveur si applicable) doit être indépendant du client.
+- **Intégration IA (obligatoire) :** Au moins une fonctionnalité IA (chatbot, STT, reconnaissance d'images, traduction, etc.). Expliquez l'architecture IA et les APIs utilisées.
+- **Base de données :**
+	- **Local (développement / portable) :** **SQLite** est requis comme base locale pour assurer portabilité et tests hors-ligne.
+	- **Déploiement (production) :** les projets déployés doivent utiliser une base cloud (**Supabase** ou **MongoDB**). N'envoyez pas de credentials en clair.
+- **Déploiement :** le projet doit être déployé et accessible publiquement selon la plateforme cible (voir section Déploiement).
+- **GitHub & workflow :** chaque membre doit contribuer de façon visible (commits, branches, PRs). Invitez le Prof. Chafik Boulealam sur votre dépôt.
 
 ---
 
+## Déploiement — exigences par plateforme
+
+- **Applications Web (obligatoire pour les projets web) :** déployer sur **Vercel**. Fournir l'URL de production, le workflow CI (GitHub Actions conseillé) et les variables d'environnement configurées via le dashboard Vercel.
+
+- **Applications Desktop :** empaqueter et distribuer via **Itch.io** (ou équivalent). Fournir l'archive/composant exécutable, instructions d'installation et page publique Itch.io.
+
+- **Applications Mobile :** utiliser **Expo** (ou équivalent). Fournir le lien Expo/Play Store/App Store si applicable, ou le lien `expo.dev` et instructions pour tester l'APK/IPA.
+
+Notes de packaging : indiquez les commandes de build, les dépendances et les étapes pour reproduire l'artefact.
+
+---
+
+## Structure recommandée du dépôt
+
+```
+project-<groupe>-<sujet>/
+├─ README.md
+├─ src/                # code source (C backend, frontend...) 
+├─ tests/              # tests unitaires et d'intégration
+├─ docs/               # documentation technique
+├─ deploy/             # scripts de déploiement / Dockerfile
+└─ demo/               # enregistrements, captures d'écran
+```
+
+---
+
+## Exigences de présentation et professionnalisme
+
+### Présentation (slides)
+
+- **Tenue professionnelle** requise pendant la soutenance.
+- **Structure recommandée des slides :**
+	1. Titre, logo ESISA, noms des membres, encadrement
+	2. Problématique et objectifs
+	3. Architecture technique (diagramme)
+	4. Démonstration technique (point focal sur le code C)
+	5. Résultats, limitations, perspectives
+	6. Q&A
+
+### Démonstration technique
+
+- La soutenance doit inclure une démonstration en direct du cœur logique (exécuter un exemple montrant la fonctionnalité en C).
+- Préparez une séquence de tests de certification (scripts ou commandes) pour prouver la robustesse.
+
+### Présence sur les réseaux / Branding professionnel
+
+- **Enregistrement vidéo :** chaque équipe doit produire une vidéo démonstrative (5–10 minutes) montrant l'usage, l'architecture et la valeur ajoutée.
+- **Publication LinkedIn :** Publiez la vidéo et un court résumé sur LinkedIn (compte d'un membre) et insérez le lien dans le `README.md`.
+
+---
+
+## Livrables critiques (checklist finale)
+
+- [ ] Lien vers le dépôt public `chafik-boulealam-lab/project-<groupe>-<sujet>`
+- [ ] `README.md` complet (membres, rôles, architecture, déploiement, demo link)
+- [ ] Code source du backend en C (avec instructions de build)
+- [ ] Tests automatisés et instructions d'exécution
+- [ ] URL de déploiement (Vercel / Expo / Itch.io)
+- [ ] Vidéo démonstrative hébergée et lien LinkedIn
+- [ ] Documentation technique (docs/)
+
+---
+
+## Critères d'évaluation (résumé)
+
+- **Fonctionnalité & Qualité (40%)** — le projet fonctionne comme décrit et couvre les exigences.
+- **Intégration IA (20%)** — pertinence et qualité de l'intégration IA.
+- **Qualité du code & tests (20%)** — propreté, structure, tests.
+- **Déploiement & accès public (10%)** — application déployée et accessible.
+- **Présentation & vidéo (10%)** — clarté et professionnalisme de la soutenance et du matériel.
 
 ---
 
 ## Sécurité & bonnes pratiques
 
-- Ne commitez pas de secrets. Utilisez des variables d'environnement et des outils de secret management.
-- Documentez clairement les étapes d'installation et de déploiement dans le `README.md`.
+- Ne commitez jamais de secrets. Utilisez les variables d'environnement et stockez les secrets dans les services (Vercel / GitHub Secrets / Expo secrets).
+- Fournissez des scripts/modes d'installation pour reproduire l'environnement local (Dockerfile ou scripts d'installation).
 
 ---
 
-Si vous avez des questions ou des besoins particuliers (webhooks, accès, etc.), contactez le professeur.
+## Support
+
+Pour toute question ou problème d'accès au dépôt/organisation, contactez le Prof. Chafik Boulealam : ch.boulealam@esisa.ac.ma
 
 Fin des consignes étudiants.
