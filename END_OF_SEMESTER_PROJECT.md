@@ -63,12 +63,6 @@ Liens :
 
 ---
 
-## Message court pour Google Chat (FR — copier/coller)
-
-@all *Lancement du projet de fin de semestre* — **Groupes de 3–5**.
-**Cœur en C**, **DB cloud** (Supabase / MongoDB), **IA obligatoire**.
-Créez votre dépôt sous l'organisation `chafik-boulealam-lab` (ex: `project-groupeX-topic`) et invitez le Prof. Chafik Boulealam.
-Détails: https://github.com/chafik-boulealam-lab/esisa-students/blob/main/END_OF_SEMESTER_PROJECT.md
 
 ---
 
