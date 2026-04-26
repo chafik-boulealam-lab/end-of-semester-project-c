@@ -8,11 +8,13 @@ Ce document décrit, de façon exhaustive et pédagogique, les exigences, les li
 
 ## Jury — Membres
 
-*Liste des membres du jury (à compléter) :* 
+*Liste officielle et ordre des membres du jury :*
 
-- [Insert Jury Names Here]
-
-Suggestions (à titre informatif) : Prof. Mehdi Iraqi Houssaini; Prof. Othman Mekouar; Dr. Chafik Boulealam; Mekouar Khalid; Mekouar Youssef.
+1. Prof. Mehdi Iraqi Houssaini (Professor of C Language Course)
+2. Prof. Othman Mekouar
+3. Director Mekouar Khalid
+4. Administrative Director Mekouar Youssef
+5. Prof. Chafik Boulealam (Professor of C Language Practical Work / TP)
 
 ---
 
@@ -94,11 +96,18 @@ project-<groupe>-<sujet>/
 
 ## Critères d'évaluation (résumé)
 
-- **Fonctionnalité & Qualité (40%)** — le projet fonctionne comme décrit et couvre les exigences.
-- **Intégration IA (20%)** — pertinence et qualité de l'intégration IA.
-- **Qualité du code & tests (20%)** — propreté, structure, tests.
-- **Déploiement & accès public (10%)** — application déployée et accessible.
-- **Présentation & vidéo (10%)** — clarté et professionnalisme de la soutenance et du matériel.
+- Fonctionnalité & Qualité (20%) — Le projet fonctionne comme décrit et couvre les exigences.
+- Intégration IA (20%) — Pertinence et qualité de l'intégration IA.
+- Qualité du code & tests (10%) — Propreté, structure, tests.
+- Déploiement & accès public (10%) — Application déployée et accessible.
+- Présentation & vidéo (40%) — Clarté et professionnalisme de la soutenance et du matériel (LinkedIn, Video, Branding).
+
+---
+
+## Durée et soutenance
+
+- Durée du projet : 1 mois.
+- Soutenance finale (date fixe) : 30/05/2026.
 
 ---
 
