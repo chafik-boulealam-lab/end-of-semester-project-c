@@ -172,107 +172,7 @@ def _build_criteria_response(criteria: JobCriteria, db: Session) -> JobCriteriaR
 
 
 def _compute_candidate_matches(criteria: JobCriteria, db: Session) -> List[CandidateMatchResponse]:
-    candidates = db.query(Candidate).all()
-    criteria_skills = db.query(CriteriaSkill).filter(
-        CriteriaSkill.criteria_id == criteria.id
-    ).all()
-
-    criteria_skills_dict = [
-        {"name": cs.skill.name, "weight": cs.weight}
-        for cs in criteria_skills
-    ]
-
-    matches: List[CandidateMatchResponse] = []
-    for candidate in candidates:
-        score, details = calculate_match_score(
-            candidate,
-            criteria_skills_dict,
-            criteria_job_title=criteria.title,
-            criteria_companies=[]
-        )
-        matches.append(CandidateMatchResponse(
-            candidate_id=candidate.id,
-            full_name=candidate.full_name,
-            email=candidate.email,
-            match_score=score,
-            explanation=details.get("details", "")
-        ))
-
-    matches.sort(key=lambda x: x.match_score, reverse=True)
-    return matches
-
-def calculate_match_score(
-    candidate: Candidate, 
-    criteria_skills: List[dict],
-    use_semantic_matching: bool = True,
-    criteria_job_title: str = "",
-    criteria_companies: List[str] = None
-) -> Tuple[float, Dict]:
-    """
-    🔄 ÉTAPE 7 OPTIMISÉE - Calculate match score using NER-extracted data
-    
-    Enhanced algorithm that considers:
-    1. Skill matching (core requirement)
-    2. Experience level (job titles extracted)
-    3. Industry experience (companies extracted)
-    4. Data quality (extraction_quality_score)
-    
-    Args:
-        candidate: Candidate object with NER-extracted fields
-        criteria_skills: Required skills with weights
-        use_semantic_matching: Enable semantic matching
-        criteria_job_title: Target job title  
-        criteria_companies: Target industries/companies
-    
-    Returns:
-        (score: 0-100, details: rich matching metrics)
-    """
-    if not criteria_skills:
-        return 50.0, {"details": "No criteria skills", "method": "baseline"}
-    
-    # ===== COMPONENT 1: SKILL MATCHING =====
-    candidate_skill_names = [skill.skill.name for skill in candidate.candidate_skills]
-    
-    skill_score = 0.0
-    total_weight = sum(s.get("weight", 50) for s in criteria_skills)
-    matched_skills_count = 0
-    
-    # Use semantic matching if available
-    if use_semantic_matching and SEMANTIC_MATCHER_AVAILABLE:
-        try:
-            match_result = SemanticSkillMatcher.match_candidate_skills(
-                candidate_skills=candidate_skill_names,
-                criteria_skills=criteria_skills,
-                threshold=0.6
-            )
-            skill_score = float(match_result["score"])
-            matched_skills_count = match_result["total_matches"]
-        except Exception:
-            # Fall back to exact matching
-            use_semantic_matching = False
-    
-    if not use_semantic_matching or skill_score == 0:
-        # Exact matching fallback
-        matched_weight = 0.0
-        candidate_skills_lower = {s.lower() for s in candidate_skill_names}
-        
-        for criteria_skill in criteria_skills:
-            skill_name = criteria_skill.get("name", "").lower()
-            weight = criteria_skill.get("weight", 50)
-            
-            if skill_name in candidate_skills_lower:
-                matched_weight += weight
-                matched_skills_count += 1
-        
-        skill_score = (matched_weight / total_weight * 100) if total_weight > 0 else 50.0
-    
-    # ===== COMPONENT 2: EXPERIENCE LEVEL (from extracted_job_titles) =====
-    experience_score = 50.0  # Default baseline
-    
-    if candidate.extracted_job_titles:
-        import json
-        try:
-            job_titles = json.loads(candidate.extracted_job_titles)
+    # Mode 2 handlers moved earlier to avoid conflicts with dynamic `{criteria_id}` routes.
             titles_lower = [str(t).lower() for t in job_titles] if isinstance(job_titles, list) else []
             
             # Look for seniority indicators
@@ -426,6 +326,106 @@ async def create_job_criteria(
         created_at=cast(datetime, db_criteria.created_at),
         required_skills=criteria.required_skills
     )
+
+# ============================================================================
+# MODE 2: GÉNÉRATION - Generate ideal profile and match
+# ============================================================================
+
+@router.post("/generate-profile")
+async def generate_ideal_profile(
+    request: GenerateProfileRequest,
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    🅱️ MODE 2 - Generate ideal candidate profile from job description
+    
+    Utilise un générateur de profil local basé sur des règles simples.
+    """
+    generated_profile = {}
+
+    if PROFILE_GENERATOR_AVAILABLE:
+        try:
+            generated_profile = ProfileGenerator.generate_from_text(request.description)
+        except Exception:
+            generated_profile = {}
+
+    # Safety fallback if model is unavailable or returns malformed output.
+    if not isinstance(generated_profile, dict):
+        generated_profile = {}
+
+    generated_skills = generated_profile.get("ideal_skills") or []
+    if not generated_skills and SKILL_EXTRACTOR_AVAILABLE:
+        extractor = SkillExtractor()
+        extracted = extractor.extract_skills(request.description, threshold=85)
+        generated_skills = [{"name": item["name"], "weight": 90, "level": "Advanced"} for item in extracted[:8]]
+
+    if not generated_skills:
+        generated_skills = [
+            {"name": "Communication", "weight": 80, "level": "Advanced"},
+            {"name": "Problem Solving", "weight": 80, "level": "Advanced"},
+            {"name": "Team Work", "weight": 70, "level": "Intermediate"},
+        ]
+
+    return {
+        "title": request.job_title,
+        "description": request.description,
+        "ideal_skills": generated_skills,
+        "ideal_experience_years": generated_profile.get("ideal_experience_years", 5),
+        "ideal_education": generated_profile.get("ideal_education", "Bachelor's degree or equivalent"),
+        "ideal_languages": generated_profile.get("ideal_languages", []),
+        "industries": generated_profile.get("industries", []),
+    }
+
+
+class GenerateAndMatchRequest(BaseModel):
+    """Request body for generate and match endpoint"""
+    job_title: str
+    description: str
+
+
+@router.post("/generate-and-match")
+async def generate_and_match(
+    request: GenerateAndMatchRequest,
+    db: Session = Depends(get_db)
+) -> dict:
+    """
+    🅱️ MODE 2 - Complete workflow:
+    1. Generate ideal profile from description
+    2. Match against all candidates with semantic matching
+    3. Return ranked results
+    """
+    # Step 1: Generate ideal profile
+    generated_profile = await generate_ideal_profile(
+        GenerateProfileRequest(job_title=request.job_title, description=request.description),
+        db
+    )
+
+    ideal_skills = generated_profile.get("ideal_skills", [])
+    candidates = db.query(Candidate).all()
+
+    # Step 2: Match all candidates against generated profile
+    matches: List[CandidateMatchResponse] = []
+    for candidate in candidates:
+        score, details = calculate_match_score(
+            candidate,
+            ideal_skills,
+            criteria_job_title=request.job_title,
+            criteria_companies=[]
+        )
+        matches.append(CandidateMatchResponse(
+            candidate_id=candidate.id,
+            full_name=candidate.full_name,
+            email=candidate.email,
+            match_score=score,
+            explanation=details.get("details", "")
+        ))
+
+    matches.sort(key=lambda m: m.match_score, reverse=True)
+
+    return {
+        "ideal_profile": generated_profile,
+        "matches": [match.model_dump() for match in matches]
+    }
 
 
 @router.post("/search/{criteria_id}")
