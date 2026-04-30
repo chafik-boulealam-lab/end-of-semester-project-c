@@ -56,7 +56,7 @@ export const matchingApi = {
 
   // Get match results for a criteria
   getCriteriaResults: (criteriaId: number, skip = 0, limit = 100) =>
-    apiClient.get<MatchResult[]>(`/matching/${criteriaId}/results`, {
+    apiClient.get<MatchResult[]>(`/api/matching/${criteriaId}/results`, {
       params: { skip, limit },
     }),
 
@@ -78,7 +78,7 @@ export const matchingApi = {
 
   // Étape 7 canonical flow: launch matching on every candidate
   runCriteriaMatching: (criteriaId: number) =>
-    apiClient.post<CriteriaMatchResult[]>(`/api/matching/${criteriaId}`),
+    apiClient.post<CriteriaMatchResult[]>(`/api/matching/${criteriaId}/results`),
 
   // Étape 7 canonical flow: retrieve the ranked results for a criteria
   getCriteriaMatchingResults: (criteriaId: number) =>
